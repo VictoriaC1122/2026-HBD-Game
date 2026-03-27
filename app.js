@@ -337,6 +337,8 @@ function playVictoryFanfare() {
   playTone(523.25, 0.12, "square", 0.08);
   setTimeout(() => playTone(659.25, 0.12, "square", 0.08), 120);
   setTimeout(() => playTone(783.99, 0.2, "square", 0.08), 240);
+  setTimeout(() => playTone(1046.5, 0.24, "triangle", 0.06), 360);
+  setTimeout(() => playTone(1318.5, 0.3, "triangle", 0.045), 460);
 }
 
 function getPhaseLabel() {
@@ -842,8 +844,15 @@ function renderWinnerShowcase() {
   const winner = appState.players.get(appState.winnerId);
   if (!winner) return "";
   const profile = getAvatarProfile(winner.avatarId);
+  const particles = Array.from({ length: 14 }, (_, index) => {
+    const left = 12 + (index % 7) * 12 + (index >= 7 ? 4 : 0);
+    const delay = (index % 7) * 70;
+    const size = index % 3 === 0 ? "lg" : index % 2 === 0 ? "md" : "sm";
+    return `<span class="winner-particle ${size}" style="left:${left}%; animation-delay:${delay}ms"></span>`;
+  }).join("");
   return `
     <div class="winner-showcase">
+      <div class="winner-particles" style="--winner-main:${profile.attack}; --winner-glow:${profile.glow}">${particles}</div>
       <div class="winner-card" style="--winner-main:${profile.attack}; --winner-glow:${profile.glow}">
         <div class="winner-badge">WINNER</div>
         <div class="winner-avatar">${avatarSvg(profile.avatar)}</div>
