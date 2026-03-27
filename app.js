@@ -67,6 +67,8 @@ const el = {
   hostView: document.querySelector("#hostView"),
   playerView: document.querySelector("#playerView"),
   statusBanner: document.querySelector("#statusBanner"),
+  tutorialOverlay: document.querySelector("#tutorialOverlay"),
+  tutorialCloseButton: document.querySelector("#tutorialCloseButton"),
   qrCode: document.querySelector("#qrCode"),
   roomCode: document.querySelector("#roomCode"),
   joinUrl: document.querySelector("#joinUrl"),
@@ -96,6 +98,7 @@ const el = {
   playerHelperText: document.querySelector("#playerHelperText"),
   playerStatusChip: document.querySelector("#playerStatusChip"),
   playerActionChip: document.querySelector("#playerActionChip"),
+  playerRoundBanner: document.querySelector("#playerRoundBanner"),
   playerLanePreview: document.querySelector("#playerLanePreview"),
   leftButton: document.querySelector("#leftButton"),
   rightButton: document.querySelector("#rightButton"),
@@ -152,6 +155,24 @@ function escapeHtml(value) {
 
 function status(text) {
   el.statusBanner.textContent = text;
+}
+
+function maybeShowTutorial() {
+  try {
+    if (window.localStorage.getItem("birthday-battle-tutorial") === "seen") return;
+  } catch (_error) {
+  }
+  el.tutorialOverlay?.classList.remove("hidden");
+  el.tutorialOverlay?.setAttribute("aria-hidden", "false");
+}
+
+function closeTutorial() {
+  el.tutorialOverlay?.classList.add("hidden");
+  el.tutorialOverlay?.setAttribute("aria-hidden", "true");
+  try {
+    window.localStorage.setItem("birthday-battle-tutorial", "seen");
+  } catch (_error) {
+  }
 }
 
 function buildJoinUrl(hostId) {
@@ -309,6 +330,30 @@ function updatePlayerUxMeta() {
   }
 
   el.playerHelperText.textContent = "已加入成功，等房主按下開始亂鬥。";
+}
+
+function updateRoundBanner() {
+  if (!el.playerRoundBanner) return;
+  if (appState.gamePhase === "finished") {
+    const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name || "本局冠軍";
+    el.playerRoundBanner.classList.remove("hidden");
+    el.playerRoundBanner.innerHTML = `
+      <strong>${winnerName}</strong>
+      <span>本局已結束，等房主按下重設本局後再來一場。</span>
+    `;
+    return;
+  }
+
+  if (appState.gamePhase === "countdown") {
+    el.playerRoundBanner.classList.remove("hidden");
+    el.playerRoundBanner.innerHTML = `
+      <strong>即將開打</strong>
+      <span>倒數 ${appState.countdownValue || ""}，把手機橫著握會更好操作。</span>
+    `;
+    return;
+  }
+
+  el.playerRoundBanner.classList.add("hidden");
 }
 
 function combatStatusText(player) {
@@ -957,6 +1002,7 @@ function updatePlayerStatus() {
   }
 
   updatePlayerUxMeta();
+  updateRoundBanner();
 }
 
 function optimisticMove(direction) {
@@ -1028,6 +1074,7 @@ function applyRemoteState(message) {
   renderCountdownOverlay();
   updatePlayerStatus();
   updatePlayerUxMeta();
+  updateRoundBanner();
 }
 
 function registerConnection(connection) {
@@ -1172,6 +1219,7 @@ function startPlayerMode(hostId) {
       el.joinButton.disabled = true;
       el.joinButton.textContent = "重新加入";
       updatePlayerUxMeta();
+      updateRoundBanner();
     });
   });
 
@@ -1225,6 +1273,13 @@ function wireEvents() {
     });
     status("正在送出加入請求...");
     updatePlayerUxMeta();
+  });
+
+  el.tutorialCloseButton?.addEventListener("click", closeTutorial);
+  el.tutorialOverlay?.addEventListener("click", (event) => {
+    if (event.target === el.tutorialOverlay) {
+      closeTutorial();
+    }
   });
 
   const sendMove = (direction) => {
@@ -1283,6 +1338,8 @@ function init() {
   startRenderLoop();
   updateHostUx(0, 0);
   updatePlayerUxMeta();
+  updateRoundBanner();
+  maybeShowTutorial();
 
   const params = new URLSearchParams(window.location.search);
   const join = params.get("join");

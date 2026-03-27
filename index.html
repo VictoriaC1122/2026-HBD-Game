@@ -17,6 +17,30 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div id="tutorialOverlay" class="tutorial-overlay hidden" aria-hidden="true">
+      <div class="tutorial-card">
+        <p class="section-label">遊戲教學</p>
+        <h2>30 秒內上手</h2>
+        <div class="tutorial-steps">
+          <div class="tutorial-step">
+            <strong>1. 房主開房</strong>
+            <span>用電腦或電視開啟主畫面，讓大家掃 QR Code 加入。</span>
+          </div>
+          <div class="tutorial-step">
+            <strong>2. 玩家選角色</strong>
+            <span>手機輸入名字、選頭像，看到 CONNECTED 就代表控制器就緒。</span>
+          </div>
+          <div class="tutorial-step">
+            <strong>3. 開打求生</strong>
+            <span>長按左右移動、JUMP 閃招、ATTACK 近戰輸出，最後活下來的人獲勝。</span>
+          </div>
+        </div>
+        <div class="tutorial-actions">
+          <button id="tutorialCloseButton" class="primary-button">開始遊玩</button>
+        </div>
+      </div>
+    </div>
+
     <div class="pixel-sky">
       <div class="pixel-cloud cloud-a"></div>
       <div class="pixel-cloud cloud-b"></div>
@@ -207,6 +231,10 @@
               <div id="playerStatusChip" class="player-status-chip">WAITING</div>
               <div id="playerActionChip" class="player-action-chip">等待開打</div>
             </div>
+            <div id="playerRoundBanner" class="player-round-banner hidden">
+              <strong>本局結束</strong>
+              <span>等房主重設後會立即回到下一場。</span>
+            </div>
             <div class="controller-caption">
               <span>移動與跳躍</span>
               <span>攻擊淘汰對手</span>
@@ -214,11 +242,19 @@
             <div class="player-lane-card">
               <div id="playerLanePreview" class="player-lane-preview"></div>
             </div>
-            <div class="battle-controls-grid">
-              <button id="leftButton" class="boost-button move-button" disabled>LEFT</button>
-              <button id="jumpButton" class="boost-button jump-button" disabled>JUMP</button>
-              <button id="rightButton" class="boost-button move-button" disabled>RIGHT</button>
-              <button id="attackButton" class="boost-button attack-button" disabled>ATTACK</button>
+            <div class="controller-deck">
+              <div class="control-cluster">
+                <div class="control-cluster-label">移動區</div>
+                <div class="battle-controls-grid movement-grid">
+                  <button id="leftButton" class="boost-button move-button" disabled>LEFT</button>
+                  <button id="jumpButton" class="boost-button jump-button" disabled>JUMP</button>
+                  <button id="rightButton" class="boost-button move-button" disabled>RIGHT</button>
+                </div>
+              </div>
+              <div class="control-cluster attack-cluster">
+                <div class="control-cluster-label">攻擊區</div>
+                <button id="attackButton" class="boost-button attack-button" disabled>ATTACK</button>
+              </div>
             </div>
             <p id="controllerHint" class="hint-text">
               等待房主開始亂鬥，倒數結束後立刻移動、跳躍、攻擊。
