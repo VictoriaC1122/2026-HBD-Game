@@ -833,6 +833,13 @@ button {
   will-change: left, bottom, transform, filter;
 }
 
+.battle-fighter::before,
+.battle-fighter::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
 .battle-fighter.is-compact {
   width: 68px;
 }
@@ -843,6 +850,19 @@ button {
 
 .battle-fighter.is-attacking .runner-avatar {
   animation: slash-lunge 220ms ease-out;
+}
+
+.battle-fighter.is-attacking::before {
+  top: 8px;
+  left: 50%;
+  width: 88px;
+  height: 88px;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.88) 0 12%, rgba(255,240,161,0.85) 12% 26%, transparent 52%),
+    conic-gradient(from 210deg, transparent 0 18%, rgba(255,244,179,0.96) 18% 38%, rgba(255,161,102,0.86) 38% 48%, transparent 48% 100%);
+  transform: translateX(-50%) scale(0.7);
+  filter: drop-shadow(0 0 12px rgba(255, 199, 98, 0.72));
+  animation: slash-burst 240ms ease-out forwards;
 }
 
 .battle-fighter.is-hit {
@@ -878,6 +898,14 @@ button {
   animation-name: run-bob-flipped;
 }
 
+.battle-fighter.is-running {
+  transform: translateX(-50%) skewX(-3deg);
+}
+
+.battle-fighter.face-left.is-running {
+  transform: translateX(-50%) skewX(3deg);
+}
+
 .battle-fighter.is-compact .runner-avatar {
   width: 44px;
   height: 44px;
@@ -886,6 +914,26 @@ button {
 
 .battle-fighter.face-left.is-compact .runner-avatar {
   transform: scaleX(-1);
+}
+
+.battle-fighter.is-running::after {
+  bottom: 6px;
+  left: 50%;
+  width: 64px;
+  height: 20px;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.55) 0 18%, transparent 19%) 4px 8px / 18px 12px no-repeat,
+    radial-gradient(circle, rgba(240,232,208,0.82) 0 30%, transparent 31%) 18px 5px / 22px 16px no-repeat,
+    radial-gradient(circle, rgba(214,198,170,0.55) 0 28%, transparent 29%) 36px 8px / 18px 12px no-repeat;
+  transform: translateX(-50%);
+  opacity: 0.8;
+  animation: run-dust 0.4s ease-out infinite;
+}
+
+.battle-fighter.is-compact.is-running::after {
+  width: 44px;
+  height: 14px;
+  bottom: 8px;
 }
 
 .fighter-hp-bar {
@@ -972,23 +1020,24 @@ button {
 }
 
 .attack-arc {
-  top: 22px;
-  width: 70px;
-  height: 40px;
-  border: 5px solid rgba(255, 230, 127, 0.95);
+  top: 14px;
+  width: 86px;
+  height: 52px;
+  border: 6px solid rgba(255, 230, 127, 0.98);
   border-left: none;
   border-bottom: none;
   border-radius: 0 70px 0 0;
-  filter: drop-shadow(0 0 8px rgba(255, 209, 84, 0.7));
+  background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent 60%);
+  filter: drop-shadow(0 0 12px rgba(255, 209, 84, 0.82));
   animation: arc-flash 220ms ease-out forwards;
 }
 
 .attack-arc.right {
-  left: 58px;
+  left: 48px;
 }
 
 .attack-arc.left {
-  right: 58px;
+  right: 48px;
   transform: scaleX(-1);
 }
 
@@ -1073,6 +1122,36 @@ button {
   }
   60% {
     transform: scaleX(-1) translateY(1px) scale(0.97, 1.04);
+  }
+}
+
+@keyframes run-dust {
+  0% {
+    opacity: 0.15;
+    transform: translateX(-50%) translateY(2px) scale(0.82);
+  }
+  40% {
+    opacity: 0.8;
+    transform: translateX(-50%) translateY(-1px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(1.2);
+  }
+}
+
+@keyframes slash-burst {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.58) rotate(-18deg);
+  }
+  35% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.02) rotate(2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.18) rotate(10deg);
   }
 }
 

@@ -51,6 +51,7 @@ const appState = {
   audioContext: null,
   joinRequested: false,
   lastLocalMoveAt: 0,
+  lastLocalStepToneAt: 0,
   lastLocalJumpAt: 0,
   lastLocalAttackAt: 0,
   damageBursts: [],
@@ -260,6 +261,17 @@ function playCountdownTone(step) {
 
 function playHitTone() {
   playTone(210, 0.08, "sawtooth", 0.07);
+  setTimeout(() => playTone(130, 0.09, "square", 0.045), 18);
+}
+
+function playAttackSwingTone() {
+  playTone(340, 0.05, "sawtooth", 0.05);
+  setTimeout(() => playTone(520, 0.04, "triangle", 0.035), 24);
+}
+
+function playStepTone(direction) {
+  const base = direction === "left" ? 190 : 210;
+  playTone(base, 0.028, "triangle", 0.018);
 }
 
 function playVictoryFanfare() {
@@ -1282,7 +1294,11 @@ function wireEvents() {
     if (!appState.hostConnection?.open || !appState.localPlayer) return;
     if (el.leftButton.disabled || el.rightButton.disabled || appState.gamePhase !== "battle") return;
     appState.hostConnection.send({ type: "move", playerId: appState.playerId, direction });
-    playTone(direction === "left" ? 260 : 280, 0.03, "square", 0.03);
+    const now = Date.now();
+    if (now - appState.lastLocalStepToneAt > 120) {
+      appState.lastLocalStepToneAt = now;
+      playStepTone(direction);
+    }
   };
 
   const sendMoveStop = (direction) => {
@@ -1307,7 +1323,7 @@ function wireEvents() {
     appState.lastLocalAttackAt = now;
     optimisticAttack();
     appState.hostConnection.send({ type: "attack", playerId: appState.playerId });
-    playTone(340, 0.07, "sawtooth", 0.05);
+    playAttackSwingTone();
   };
 
   const bindMoveButton = (button, direction) => {
