@@ -17,18 +17,18 @@ const HIT_STUN = 360;
 const COUNTDOWN_STEPS = ["3", "2", "1", "FIGHT!"];
 
 const avatarDefinitions = [
-  { id: "rose", name: "Rose Hero", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
-  { id: "mint", name: "Mint Bunny", colors: ["#8de5c1", "#d3fff1", "#2a6d5a"], icon: "bunny" },
-  { id: "pixel", name: "Pixel Fox", colors: ["#ff9b54", "#ffe1bf", "#723b17"], icon: "fox" },
-  { id: "nova", name: "Nova Cat", colors: ["#8bb6ff", "#e2edff", "#304884"], icon: "cat" },
-  { id: "mango", name: "Mango Dino", colors: ["#ffd166", "#fff1bf", "#8c5b13"], icon: "dino" },
-  { id: "aqua", name: "Aqua Whale", colors: ["#72ddf7", "#def8ff", "#23667a"], icon: "whale" },
-  { id: "cocoa", name: "Cocoa Pup", colors: ["#bc8d62", "#f2dec6", "#5a3d28"], icon: "pup" },
-  { id: "violet", name: "Violet Mage", colors: ["#be97ff", "#f1e4ff", "#52388c"], icon: "mage" },
-  { id: "pearl", name: "Pearl Chick", colors: ["#ff8d72", "#ffe4cc", "#7a3d25"], icon: "chick" },
-  { id: "leaf", name: "Leaf Bear", colors: ["#9ed36a", "#eefbd9", "#3b6f1d"], icon: "bear" },
-  { id: "ember", name: "Ember Star", colors: ["#ff7b5a", "#ffe1d8", "#833226"], icon: "star" },
-  { id: "glow", name: "Glow Robot", colors: ["#85f4ff", "#e2fdff", "#305764"], icon: "robot" }
+  { id: "rose", name: "Crimson Warrior", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
+  { id: "mint", name: "Mint Archer", colors: ["#8de5c1", "#d3fff1", "#2a6d5a"], icon: "bunny" },
+  { id: "pixel", name: "Amber Thief", colors: ["#ff9b54", "#ffe1bf", "#723b17"], icon: "fox" },
+  { id: "nova", name: "Sky Knight", colors: ["#8bb6ff", "#e2edff", "#304884"], icon: "cat" },
+  { id: "mango", name: "Moss Lancer", colors: ["#ffd166", "#fff1bf", "#8c5b13"], icon: "dino" },
+  { id: "aqua", name: "Wave Pirate", colors: ["#72ddf7", "#def8ff", "#23667a"], icon: "whale" },
+  { id: "cocoa", name: "Cocoa Boxer", colors: ["#bc8d62", "#f2dec6", "#5a3d28"], icon: "pup" },
+  { id: "violet", name: "Violet Wizard", colors: ["#be97ff", "#f1e4ff", "#52388c"], icon: "mage" },
+  { id: "pearl", name: "Sun Priest", colors: ["#ff8d72", "#ffe4cc", "#7a3d25"], icon: "chick" },
+  { id: "leaf", name: "Leaf Hunter", colors: ["#9ed36a", "#eefbd9", "#3b6f1d"], icon: "bear" },
+  { id: "ember", name: "Ember Assassin", colors: ["#ff7b5a", "#ffe1d8", "#833226"], icon: "star" },
+  { id: "glow", name: "Nova Mechanic", colors: ["#85f4ff", "#e2fdff", "#305764"], icon: "robot" }
 ];
 
 const appState = {
@@ -125,6 +125,20 @@ function iconMarkup(icon, accent) {
   };
 
   const costume = costumes[icon] || costumes.hero;
+  const props = {
+    hero: `<path d="M44 35h8v4h-8zM50 26h3v18h-3z" fill="#d7eefb"/><path d="M48 24h7v4h-7z" fill="#9dd5ef"/>`,
+    bunny: `<path d="M43 36h9v3h-9zM50 28h2v13h-2z" fill="#8f5b2f"/><path d="M42 28c4-4 7-5 12-3-2 3-5 5-12 3z" fill="#e7f6d1"/>`,
+    fox: `<path d="M43 38h7v3h-7zM49 31h3v12h-3z" fill="#50586c"/><path d="M44 30h8v4h-8z" fill="#f8f1d2"/>`,
+    cat: `<path d="M43 36h10v4H43z" fill="#bfd2ff"/><path d="M50 28h3v12h-3z" fill="#6b82c7"/>`,
+    dino: `<path d="M44 35h3v15h-3zM43 34h10v4H43z" fill="#d9b36f"/><path d="M49 28h3v8h-3z" fill="#9f7b41"/>`,
+    whale: `<path d="M14 34h8v4h-8zM13 36h3v10h-3z" fill="#3b5f8c"/><path d="M11 31h12v4H11z" fill="#c4efff"/>`,
+    pup: `<path d="M44 37h8v4h-8z" fill="#d78655"/><path d="M46 35h4v11h-4z" fill="#7d3430"/>`,
+    mage: `<path d="M44 20h4v26h-4z" fill="#8a6cff"/><circle cx="46" cy="18" r="5" fill="#ffeb9a"/><circle cx="46" cy="18" r="2" fill="#fff"/>`,
+    chick: `<path d="M14 37h9v4h-9z" fill="#f4cf7d"/><path d="M12 38h4v10h-4z" fill="#c78453"/>`,
+    bear: `<path d="M43 35h8v4h-8zM50 30h3v15h-3z" fill="#6ea44b"/><path d="M44 29h8v3h-8z" fill="#d9f1be"/>`,
+    star: `<path d="M43 36h10v4H43z" fill="#ffb26b"/><path d="M48 28h3v12h-3z" fill="#9b3b2c"/>`,
+    robot: `<path d="M44 36h10v5H44z" fill="#d4f8ff"/><path d="M48 27h3v15h-3z" fill="#6aa8bf"/><circle cx="49" cy="24" r="3" fill="#ffcf6b"/>`
+  };
   return `
     <ellipse cx="32" cy="57" rx="13" ry="4" fill="rgba(17,24,39,0.22)"/>
     <path d="M20 47h24v7H20z" fill="${costume.gear}"/>
@@ -139,6 +153,7 @@ function iconMarkup(icon, accent) {
     <path d="M29 33h6v2h-6z" fill="#c76f6f"/>
     <path d="M24 15h4v5h-4zM36 15h4v5h-4z" fill="${costume.trim}"/>
     <path d="M20 17h6v4h-6zM38 17h6v4h-6z" fill="${costume.trim}" opacity="0.85"/>
+    ${props[icon] || ""}
     <circle cx="47" cy="19" r="4" fill="${costume.aura}" opacity="0.92"/>
     <path d="M44 18h6v2h-6zM46 16h2v6h-2z" fill="#fff"/>
   `;
