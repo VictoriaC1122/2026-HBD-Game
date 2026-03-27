@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Birthday Dash Deluxe</title>
+    <title>Birthday Battle Arena</title>
     <meta
       name="description"
-      content="像素風多人生日派對競速遊戲，掃 QR Code 用手機加入，在大螢幕上比賽誰先衝過終點。"
+      content="多人手機加入的生日亂鬥遊戲，掃 QR Code 一起進場，打到最後活下來的人獲勝。"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -29,38 +29,38 @@
       <section class="hero-card">
         <div class="hero-layout">
           <div class="hero-copy">
-            <p class="eyebrow">Pixel Party Race</p>
-            <h1>Birthday Dash Deluxe</h1>
+            <p class="eyebrow">Party Brawl Arena</p>
+            <h1>Birthday Battle Arena</h1>
             <p class="hero-text">
-              原創像素派對競速遊戲。主持人開房後，大家掃碼加入、選角色、在同一張奇幻地圖裡跑跳競速，看誰最先衝進終點傳送門。
+              掃 QR Code 用手機加入，全部人同場開打。左右移動、跳躍、揮擊，血條歸零就淘汰，最後活著的人就是今晚冠軍。
             </p>
           </div>
           <div class="hero-steps">
             <div class="mini-step">
               <span>1</span>
-              <strong>開房掃碼</strong>
-              <p>房主顯示 QR Code，大家用手機加入。</p>
+              <strong>掃碼進場</strong>
+              <p>房主顯示 QR Code，大家用手機加入戰場。</p>
             </div>
             <div class="mini-step">
               <span>2</span>
-              <strong>選角準備</strong>
-              <p>輸入名字、挑頭像、等待倒數開始。</p>
+              <strong>左右跳打</strong>
+              <p>用手機控制角色移動、跳躍與攻擊。</p>
             </div>
             <div class="mini-step">
               <span>3</span>
-              <strong>跑跳競速</strong>
-              <p>用 `RUN` 前進、`JUMP` 躲障礙，衝向終點。</p>
+              <strong>活到最後</strong>
+              <p>血條歸零就淘汰，最後存活的人獲勝。</p>
             </div>
           </div>
         </div>
         <div class="hero-pill-row">
-          <span class="hero-pill">橫向卷軸視覺</span>
-          <span class="hero-pill">3 2 1 倒數音效</span>
-          <span class="hero-pill">多人手機加入</span>
+          <span class="hero-pill">多人同場亂鬥</span>
+          <span class="hero-pill">血條與傷害字</span>
+          <span class="hero-pill">手機直接操控</span>
         </div>
       </section>
 
-      <section id="statusBanner" class="status-banner">正在準備遊戲...</section>
+      <section id="statusBanner" class="status-banner">正在準備戰場...</section>
 
       <section id="hostView" class="panel hidden" aria-label="主機畫面">
         <div class="panel-grid host-grid">
@@ -68,7 +68,7 @@
             <div class="card-header">
               <div>
                 <p class="section-label">房間資訊</p>
-                <h2>掃碼加入 Birthday Dash</h2>
+                <h2>讓大家掃碼進場</h2>
               </div>
               <button id="copyLinkButton" class="secondary-button">複製加入連結</button>
             </div>
@@ -89,7 +89,7 @@
                   <strong id="playerCount">0</strong>
                 </div>
                 <p class="hint-text">
-                  建議把主機畫面投到電視。玩家掃碼後會在手機上選頭像，再用手機按鈕衝刺。
+                  建議把主機畫面投到電視。每位玩家用手機操控自己的角色，打到最後活下來的人獲勝。
                 </p>
               </div>
             </div>
@@ -105,7 +105,7 @@
 
             <div class="host-status-grid">
               <div class="host-mini-card">
-                <span class="host-mini-label">目前領先</span>
+                <span class="host-mini-label">目前存活</span>
                 <strong id="hostLeader">等待中</strong>
               </div>
               <div class="host-mini-card">
@@ -115,17 +115,17 @@
             </div>
 
             <div class="controls-row">
-              <button id="startRaceButton" class="primary-button">開始比賽</button>
+              <button id="startRaceButton" class="primary-button">開始亂鬥</button>
               <button id="resetRaceButton" class="secondary-button">重設本局</button>
             </div>
             <div class="quick-guide">
-              <div class="guide-pill">`RUN` 前進</div>
-              <div class="guide-pill">`JUMP` 跳躍</div>
-              <div class="guide-pill">星星加速</div>
-              <div class="guide-pill">障礙要躲</div>
+              <div class="guide-pill">LEFT / RIGHT</div>
+              <div class="guide-pill">JUMP 跳躍</div>
+              <div class="guide-pill">ATTACK 揮擊</div>
+              <div class="guide-pill">最後存活獲勝</div>
             </div>
             <p class="hint-text">
-              開始後會先倒數 3、2、1，再正式開跑。踩到星星磚塊會爆衝，踩到泥巴洞會被拖慢。
+              開始後會先倒數，再正式開打。跳起來可以閃掉部分攻擊，近距離揮擊能打出傷害與擊退。
             </p>
           </div>
         </div>
@@ -134,18 +134,18 @@
           <div class="card-header">
             <div>
               <p class="section-label">主舞台</p>
-              <h2>像素大螢幕競速</h2>
+              <h2>奇幻亂鬥競技場</h2>
             </div>
             <div id="raceSummary" class="race-summary">等待玩家加入...</div>
           </div>
 
           <div class="track-legend">
-            <span><i class="legend-boost"></i> 星星磚</span>
-            <span><i class="legend-trap"></i> 泥巴洞</span>
-            <span><i class="legend-finish"></i> 終點城堡</span>
+            <span><i class="legend-boost"></i> 揮擊範圍</span>
+            <span><i class="legend-trap"></i> 受傷狀態</span>
+            <span><i class="legend-finish"></i> 最後存活者</span>
           </div>
 
-          <div class="race-stage">
+          <div class="race-stage battle-stage">
             <div class="stage-hud">
               <div class="hud-chip">
                 <span class="hud-label">PLAYERS</span>
@@ -157,7 +157,7 @@
               </div>
               <div class="hud-chip">
                 <span class="hud-label">GOAL</span>
-                <strong>CASTLE</strong>
+                <strong>SURVIVE</strong>
               </div>
             </div>
 
@@ -177,19 +177,19 @@
         <div class="card player-card">
           <div id="joinPanel">
             <p class="section-label">手機加入</p>
-            <h2>選角色，準備衝刺</h2>
+            <h2>選角色，準備開打</h2>
             <label class="input-label" for="playerName">你的名字</label>
             <input id="playerName" class="text-input" type="text" maxlength="16" placeholder="例如：小婷" />
 
             <div>
               <div class="avatar-header">
-                <span class="input-label">選一個像素角色</span>
+                <span class="input-label">選一個戰鬥角色</span>
                 <span id="selectedAvatarName" class="avatar-name"></span>
               </div>
               <div id="avatarPicker" class="avatar-picker"></div>
             </div>
 
-            <button id="joinButton" class="primary-button full-width">加入房間</button>
+            <button id="joinButton" class="primary-button full-width">加入戰場</button>
           </div>
 
           <div id="controllerPanel" class="hidden">
@@ -197,21 +197,23 @@
             <h2 id="playerGreeting">準備開始</h2>
             <div class="player-status-bar">
               <div id="playerStatusChip" class="player-status-chip">WAITING</div>
-              <div id="playerActionChip" class="player-action-chip">等待開始</div>
+              <div id="playerActionChip" class="player-action-chip">等待開打</div>
             </div>
             <div class="controller-caption">
-              <span>左邊衝刺</span>
-              <span>右邊跳躍</span>
+              <span>移動與跳躍</span>
+              <span>攻擊淘汰對手</span>
             </div>
             <div class="player-lane-card">
               <div id="playerLanePreview" class="player-lane-preview"></div>
             </div>
-            <div class="controller-buttons">
-              <button id="boostButton" class="boost-button run-button" disabled>RUN</button>
+            <div class="battle-controls-grid">
+              <button id="leftButton" class="boost-button move-button" disabled>LEFT</button>
               <button id="jumpButton" class="boost-button jump-button" disabled>JUMP</button>
+              <button id="rightButton" class="boost-button move-button" disabled>RIGHT</button>
+              <button id="attackButton" class="boost-button attack-button" disabled>ATTACK</button>
             </div>
             <p id="controllerHint" class="hint-text">
-              等待房主開始比賽，倒數結束後狂按按鈕衝向終點。
+              等待房主開始亂鬥，倒數結束後立刻移動、跳躍、攻擊。
             </p>
           </div>
         </div>

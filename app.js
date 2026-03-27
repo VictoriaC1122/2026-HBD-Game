@@ -1,11 +1,14 @@
-const FINISH_DISTANCE = 100;
-const BOOST_STEP = 7;
-const BASE_STEP = 3;
-const HOP_COOLDOWN = 125;
-const JUMP_COOLDOWN = 620;
-const JUMP_AIR_TIME = 720;
-const COUNTDOWN_STEPS = ["3", "2", "1", "GO!"];
-const laneThemes = ["sky", "sunset", "night", "cave"];
+const MAX_HP = 100;
+const MOVE_STEP = 3.2;
+const ATTACK_RANGE = 11;
+const ATTACK_DAMAGE_MIN = 15;
+const ATTACK_DAMAGE_MAX = 28;
+const ATTACK_COOLDOWN = 760;
+const MOVE_COOLDOWN = 80;
+const JUMP_COOLDOWN = 760;
+const JUMP_AIR_TIME = 780;
+const HIT_STUN = 420;
+const COUNTDOWN_STEPS = ["3", "2", "1", "FIGHT!"];
 
 const avatarDefinitions = [
   { id: "rose", name: "Rose Hero", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
@@ -22,21 +25,6 @@ const avatarDefinitions = [
   { id: "glow", name: "Glow Robot", colors: ["#85f4ff", "#e2fdff", "#305764"], icon: "robot" }
 ];
 
-const laneZones = [
-  { position: 23, type: "boost", icon: "★" },
-  { position: 39, type: "trap", icon: "!" },
-  { position: 56, type: "boost", icon: "★" },
-  { position: 74, type: "trap", icon: "!" }
-];
-
-const laneObstacles = [
-  { position: 17, type: "crate" },
-  { position: 34, type: "spike" },
-  { position: 51, type: "spring" },
-  { position: 67, type: "crate" },
-  { position: 83, type: "spike" }
-];
-
 const appState = {
   mode: "host",
   peer: null,
@@ -49,7 +37,6 @@ const appState = {
   playerId: crypto.randomUUID(),
   localPlayer: null,
   localPlayerSnapshot: [],
-  raceStarted: false,
   winnerId: null,
   joinUrl: "",
   gamePhase: "lobby",
@@ -57,8 +44,10 @@ const appState = {
   countdownTimer: null,
   audioContext: null,
   joinRequested: false,
-  lastLocalHopAt: 0,
-  lastLocalJumpAt: 0
+  lastLocalMoveAt: 0,
+  lastLocalJumpAt: 0,
+  lastLocalAttackAt: 0,
+  damageBursts: []
 };
 
 const el = {
@@ -92,8 +81,10 @@ const el = {
   playerStatusChip: document.querySelector("#playerStatusChip"),
   playerActionChip: document.querySelector("#playerActionChip"),
   playerLanePreview: document.querySelector("#playerLanePreview"),
-  boostButton: document.querySelector("#boostButton"),
+  leftButton: document.querySelector("#leftButton"),
+  rightButton: document.querySelector("#rightButton"),
   jumpButton: document.querySelector("#jumpButton"),
+  attackButton: document.querySelector("#attackButton"),
   controllerHint: document.querySelector("#controllerHint")
 };
 
@@ -101,16 +92,16 @@ function iconMarkup(icon, accent) {
   const paths = {
     fox: `<path d="M10 24h8v8h-8zM18 16h8v8h-8zM38 16h8v8h-8zM46 24h8v8h-8zM18 24h28v24H18zM22 36h4v4h-4zM38 36h4v4h-4zM28 44h8v4h-8z" fill="${accent}"/><path d="M22 28h20v12H22z" fill="#fff4df"/>`,
     bunny: `<path d="M20 6h8v18h-8zM36 6h8v18h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffaf2"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM30 42h4v4h-4z" fill="#2d2d2d"/>`,
-    cat: `<path d="M16 18h8v8h-8zM24 10h8v8h-8zM32 10h8v8h-8zM40 18h8v8h-8zM16 26h32v24H16z" fill="${accent}"/><path d="M20 30h24v16H20z" fill="#fff4fb"/><path d="M24 36h4v4h-4zM36 36h4v4h-4zM28 42h8v4h-8z" fill="#2d2d2d"/>`,
-    bear: `<path d="M14 18h8v8h-8zM42 18h8v8h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffefc"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM28 42h8v4h-8z" fill="#2d2d2d"/>`,
-    hero: `<path d="M22 8h20v10H22zM18 18h28v12H18zM16 30h12v18H16zM36 30h12v18H36zM28 30h8v18h-8z" fill="${accent}"/><path d="M22 18h20v14H22z" fill="#fff4de"/><path d="M26 22h4v4h-4zM34 22h4v4h-4zM28 28h8v4h-8z" fill="#2d2d2d"/>`,
-    dino: `<path d="M16 18h20v8H16zM36 22h12v20H36zM20 26h20v20H20zM16 38h8v10h-8z" fill="${accent}"/><path d="M24 26h12v16H24z" fill="#f5ffed"/><path d="M26 30h4v4h-4zM34 30h4v4h-4zM28 38h8v4h-8z" fill="#2d2d2d"/>`,
-    whale: `<path d="M12 22h36v20H12zM48 26h6v12h-6zM20 18h18v6H20z" fill="${accent}"/><path d="M20 26h20v12H20z" fill="#def8ff"/><path d="M24 30h4v4h-4zM36 30h4v4h-4zM28 36h8v4h-8z" fill="#2d2d2d"/>`,
-    pup: `<path d="M16 18h10v8H16zM38 18h10v8H38zM18 24h28v24H18z" fill="${accent}"/><path d="M22 28h20v18H22z" fill="#fff7f0"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM28 42h8v4h-8z" fill="#2d2d2d"/>`,
-    mage: `<path d="M20 8h24v8H20zM16 16h32v10H16zM20 26h24v22H20z" fill="${accent}"/><path d="M24 20h16v20H24z" fill="#fff8ff"/><path d="M26 28h4v4h-4zM34 28h4v4h-4zM28 36h8v4h-8z" fill="#2d2d2d"/>`,
-    chick: `<path d="M18 16h28v8H18zM16 24h32v22H16z" fill="${accent}"/><path d="M20 28h24v16H20z" fill="#ffe9cc"/><path d="M24 32h4v4h-4zM36 32h4v4h-4zM28 38h8v4h-8z" fill="#2d2d2d"/><path d="M28 40h8v4h-8z" fill="#ff9348"/>`,
-    star: `<path d="M28 10h8v8h8v8h8v8h-8v8h-8v8h-8v-8h-8v-8h-8v-8h8v-8h8z" fill="${accent}"/><path d="M24 28h4v4h-4zM36 28h4v4h-4zM26 36h12v4H26z" fill="#2d2d2d"/>`,
-    robot: `<path d="M20 10h24v6H20zM18 18h28v24H18zM14 24h4v10h-4zM46 24h4v10h-4zM22 42h8v8h-8zM34 42h8v8h-8z" fill="${accent}"/><path d="M22 22h20v16H22z" fill="#edfdfd"/><path d="M24 26h4v4h-4zM36 26h4v4h-4zM26 34h12v4H26z" fill="#2d2d2d"/>`
+    cat: `<path d="M16 18h8v8h-8zM24 10h8v8h-8zM32 10h8v8h-8zM40 18h8v8h-8zM16 26h32v24H16z" fill="${accent}"/><path d="M20 30h24v16H20z" fill="#fff4fb"/>`,
+    bear: `<path d="M14 18h8v8h-8zM42 18h8v8h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffefc"/>`,
+    hero: `<path d="M22 8h20v10H22zM18 18h28v12H18zM16 30h12v18H16zM36 30h12v18H36zM28 30h8v18h-8z" fill="${accent}"/><path d="M22 18h20v14H22z" fill="#fff4de"/>`,
+    dino: `<path d="M16 18h20v8H16zM36 22h12v20H36zM20 26h20v20H20zM16 38h8v10h-8z" fill="${accent}"/><path d="M24 26h12v16H24z" fill="#f5ffed"/>`,
+    whale: `<path d="M12 22h36v20H12zM48 26h6v12h-6zM20 18h18v6H20z" fill="${accent}"/><path d="M20 26h20v12H20z" fill="#def8ff"/>`,
+    pup: `<path d="M16 18h10v8H16zM38 18h10v8H38zM18 24h28v24H18z" fill="${accent}"/><path d="M22 28h20v18H22z" fill="#fff7f0"/>`,
+    mage: `<path d="M20 8h24v8H20zM16 16h32v10H16zM20 26h24v22H20z" fill="${accent}"/><path d="M24 20h16v20H24z" fill="#fff8ff"/>`,
+    chick: `<path d="M18 16h28v8H18zM16 24h32v22H16z" fill="${accent}"/><path d="M20 28h24v16H20z" fill="#ffe9cc"/>`,
+    star: `<path d="M28 10h8v8h8v8h8v8h-8v8h-8v8h-8v-8h-8v-8h-8v-8h8v-8h8z" fill="${accent}"/>`,
+    robot: `<path d="M20 10h24v6H20zM18 18h28v24H18zM14 24h4v10h-4zM46 24h4v10h-4zM22 42h8v8h-8zM34 42h8v8h-8z" fill="${accent}"/><path d="M22 22h20v16H22z" fill="#edfdfd"/>`
   };
 
   return paths[icon];
@@ -141,10 +132,6 @@ function escapeHtml(value) {
     const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
     return map[char];
   });
-}
-
-function formatRank(index) {
-  return ["1ST", "2ND", "3RD"][index] || `${index + 1}TH`;
 }
 
 function status(text) {
@@ -179,7 +166,6 @@ function renderQrFallback(url) {
 
 async function renderQrCode(url) {
   const qrApi = window.QRCode || globalThis.QRCode;
-
   el.qrCode.innerHTML = "";
 
   if (qrApi?.toDataURL) {
@@ -190,27 +176,13 @@ async function renderQrCode(url) {
       image.width = 220;
       image.height = 220;
       image.alt = "加入房間 QR Code";
-      image.loading = "eager";
-      image.decoding = "async";
       el.qrCode.append(image);
-      return true;
-    } catch (_error) {
-    }
-  }
-
-  if (qrApi?.toCanvas) {
-    try {
-      const canvas = document.createElement("canvas");
-      await qrApi.toCanvas(canvas, url, { width: 220, margin: 1 });
-      el.qrCode.append(canvas);
-      return true;
+      return;
     } catch (_error) {
     }
   }
 
   renderQrFallback(url);
-  status("已改用備援 QR Code 服務，仍可正常掃碼加入。");
-  return false;
 }
 
 function getAudioContext() {
@@ -230,7 +202,6 @@ function playTone(frequency, duration, type = "square", volume = 0.05) {
   if (!ctx) return;
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
-
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
   gain.gain.setValueAtTime(volume, ctx.currentTime);
@@ -242,22 +213,49 @@ function playTone(frequency, duration, type = "square", volume = 0.05) {
 }
 
 function playCountdownTone(step) {
-  if (step === "GO!") {
-    playTone(660, 0.18, "square", 0.08);
-    setTimeout(() => playTone(880, 0.18, "square", 0.08), 110);
+  if (step === "FIGHT!") {
+    playTone(640, 0.18, "square", 0.08);
+    setTimeout(() => playTone(920, 0.2, "square", 0.08), 100);
     return;
   }
   playTone(440, 0.14, "square", 0.06);
 }
 
-function playVictoryFanfare() {
-  playTone(523.25, 0.12, "square", 0.08);
-  setTimeout(() => playTone(659.25, 0.12, "square", 0.08), 130);
-  setTimeout(() => playTone(783.99, 0.18, "square", 0.08), 260);
+function playHitTone() {
+  playTone(210, 0.08, "sawtooth", 0.07);
 }
 
-function themeForIndex(index) {
-  return laneThemes[index % laneThemes.length];
+function playVictoryFanfare() {
+  playTone(523.25, 0.12, "square", 0.08);
+  setTimeout(() => playTone(659.25, 0.12, "square", 0.08), 120);
+  setTimeout(() => playTone(783.99, 0.2, "square", 0.08), 240);
+}
+
+function getPhaseLabel() {
+  if (appState.gamePhase === "countdown") return "COUNTDOWN";
+  if (appState.gamePhase === "battle") return "BATTLE";
+  if (appState.gamePhase === "finished") return "FINISH";
+  return "LOBBY";
+}
+
+function combatStatusText(player) {
+  if (!player || player.dead) return "OUT";
+  if ((player.attackingUntil || 0) > Date.now()) return "SLASH";
+  if ((player.hitUntil || 0) > Date.now()) return "HIT";
+  if ((player.airborneUntil || 0) > Date.now()) return "JUMP";
+  return "READY";
+}
+
+function isAirborne(player, now = Date.now()) {
+  return (player.airborneUntil || 0) > now;
+}
+
+function isAlive(player) {
+  return !player.dead && player.hp > 0;
+}
+
+function playerBottom(index) {
+  return 72 + (index % 6) * 14;
 }
 
 function setupAvatarPicker() {
@@ -283,72 +281,41 @@ function setupAvatarPicker() {
   });
 }
 
-function worldOffset(progress) {
-  return Math.min(420, Math.round(progress * 4.2));
-}
-
-function cameraForProgress(progress) {
-  return Math.max(0, Math.min(FINISH_DISTANCE - 24, progress - 24));
-}
-
-function viewportLeft(progress, camera) {
-  return Math.max(4, Math.min(90, 10 + (progress - camera) * 2.6));
-}
-
-function runnerLeft(progress, camera) {
-  return `${viewportLeft(progress, camera)}%`;
-}
-
-function isAirborne(player, now = Date.now()) {
-  return (player.airborneUntil || 0) > now;
-}
-
-function sharedRunnerBottom(index) {
-  return 52 + (index % 5) * 18;
-}
-
-function sharedMapDecorations(camera) {
-  const offset = worldOffset(camera);
-  const cloudOffset = Math.round(offset * 0.24);
-  const hillOffset = Math.round(offset * 0.5);
-  const treeOffset = Math.round(offset * 0.92);
-
+function arenaDecorations() {
   return `
-    <div class="shared-backdrop">
-      <div class="fantasy-layer fantasy-sky"></div>
-      <div class="fantasy-layer fantasy-clouds" style="transform:translateX(-${cloudOffset}px)"></div>
-      <div class="fantasy-layer fantasy-hills" style="transform:translateX(-${hillOffset}px)"></div>
-      <div class="fantasy-layer fantasy-trees" style="transform:translateX(-${treeOffset}px)"></div>
-      <div class="fantasy-layer fantasy-islands" style="transform:translateX(-${Math.round(hillOffset * 0.8)}px)"></div>
-      <div class="forest-ground"></div>
-      <div class="forest-shadow"></div>
-      <div class="forest-mushroom giant"></div>
-      <div class="forest-mushroom mini"></div>
-      <div class="forest-crystal crystal-a"></div>
-      <div class="forest-crystal crystal-b"></div>
-      ${laneZones
-        .map(
-          (zone) => `
-            <div class="forest-zone ${zone.type}" style="left:${viewportLeft(zone.position, camera)}%">${zone.icon}</div>
-          `
-        )
-        .join("")}
-      ${laneObstacles
-        .map(
-          (obstacle) => `<div class="forest-obstacle ${obstacle.type}" style="left:${viewportLeft(obstacle.position, camera)}%"></div>`
-        )
-        .join("")}
-      <div class="finish-tree" style="left:${viewportLeft(FINISH_DISTANCE, camera)}%"></div>
-      <div class="finish-portal" style="left:${viewportLeft(FINISH_DISTANCE, camera)}%"></div>
+    <div class="battle-backdrop">
+      <div class="battle-layer battle-sky"></div>
+      <div class="battle-layer battle-clouds"></div>
+      <div class="battle-layer battle-crystals"></div>
+      <div class="battle-layer battle-trees"></div>
+      <div class="battle-platform ground"></div>
+      <div class="battle-platform float-a"></div>
+      <div class="battle-platform float-b"></div>
+      <div class="battle-platform float-c"></div>
+      <div class="arena-totem left"></div>
+      <div class="arena-totem right"></div>
+      <div class="arena-gate"></div>
     </div>
   `;
 }
 
-function getPhaseLabel() {
-  if (appState.gamePhase === "countdown") return "COUNTDOWN";
-  if (appState.gamePhase === "racing") return "RACING";
-  if (appState.gamePhase === "finished") return "FINISH";
-  return "LOBBY";
+function clampX(x) {
+  return Math.max(6, Math.min(94, x));
+}
+
+function addDamageBurst(x, amount, crit = false) {
+  appState.damageBursts.push({
+    id: crypto.randomUUID(),
+    x,
+    amount,
+    crit,
+    createdAt: Date.now()
+  });
+}
+
+function pruneDamageBursts() {
+  const now = Date.now();
+  appState.damageBursts = appState.damageBursts.filter((burst) => now - burst.createdAt < 820);
 }
 
 function renderCountdownOverlay() {
@@ -358,140 +325,160 @@ function renderCountdownOverlay() {
   }
   el.countdownOverlay.classList.remove("hidden");
   el.countdownNumber.textContent = appState.countdownValue;
-  el.countdownLabel.textContent = appState.countdownValue === "GO!" ? "RUN!" : "READY";
+  el.countdownLabel.textContent = appState.countdownValue === "FIGHT!" ? "BATTLE!" : "READY";
 }
 
-function renderHostTrack() {
-  const players = [...appState.players.values()].sort((a, b) => {
-    if (b.progress !== a.progress) return b.progress - a.progress;
-    return a.joinedAt - b.joinedAt;
+function renderPodium(players) {
+  el.podium.innerHTML = players
+    .slice(0, 4)
+    .map((player, index) => {
+      const avatar = getAvatarById(player.avatarId);
+      const label = isAlive(player) ? `${player.hp} HP` : "淘汰";
+      return `
+        <div class="podium-card" data-rank="${index + 1}">
+          <div class="avatar-badge">${avatarSvg(avatar)}</div>
+          <div>
+            <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
+            <span>${label}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderBattleArena(players) {
+  const sorted = [...players].sort((a, b) => {
+    if (Number(isAlive(b)) !== Number(isAlive(a))) return Number(isAlive(b)) - Number(isAlive(a));
+    return b.hp - a.hp;
   });
 
-  el.playerCount.textContent = String(players.length);
-  el.hudPlayers.textContent = String(players.length);
+  el.playerCount.textContent = String(sorted.length);
+  el.hudPlayers.textContent = String(sorted.length);
   el.hudMode.textContent = getPhaseLabel();
   el.hostPhase.textContent = getPhaseLabel();
-  el.hostLeader.textContent = players[0]?.name || "等待中";
 
-  if (!players.length) {
+  const alivePlayers = sorted.filter(isAlive);
+  el.hostLeader.textContent = alivePlayers[0]?.name || "全滅";
+
+  const damageMarkup = appState.damageBursts
+    .map(
+      (burst) => `
+        <div class="damage-burst ${burst.crit ? "crit" : ""}" style="left:${burst.x}%">-${burst.amount}</div>
+      `
+    )
+    .join("");
+
+  if (!sorted.length) {
     el.track.innerHTML = `
-      <div class="shared-map">
-        ${sharedMapDecorations(0)}
-        <div class="shared-map-header">
-          <div class="shared-map-copy">
-            <strong>等待玩家加入</strong>
-            <span>掃描 QR Code 後，所有玩家會一起在同一張奇幻森林地圖裡開跑</span>
-          </div>
+      <div class="battle-map">
+        ${arenaDecorations()}
+        <div class="battle-map-copy">
+          <strong>等待玩家加入</strong>
+          <span>掃描 QR Code 加入戰場，倒數後開始大亂鬥。</span>
         </div>
       </div>
     `;
-    el.podium.innerHTML = "";
     el.raceSummary.textContent = "等待玩家加入...";
     el.startRaceButton.disabled = true;
-    el.hostLeader.textContent = "等待中";
     renderCountdownOverlay();
+    renderPodium([]);
     return;
   }
 
-  el.startRaceButton.disabled = players.length < 2 || appState.gamePhase === "countdown";
-  const leaderProgress = players[0]?.progress || 0;
-  const camera = cameraForProgress(leaderProgress);
+  el.startRaceButton.disabled = sorted.length < 2 || appState.gamePhase === "countdown";
 
-  const runnerMarkup = players
+  const fighterMarkup = sorted
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
-      const effectLabel =
-        player.effect === "boost"
-          ? "STAR BOOST"
-          : player.effect === "trap"
-            ? "MUD TRAP"
-            : player.effect === "crash"
-              ? "OUCH!"
-              : isAirborne(player)
-                ? "JUMPING"
-                : "RUNNING";
-      const runnerClass = [
-        "runner",
-        player.effect === "boost" ? "is-boosting" : "",
-        player.effect === "trap" ? "is-trapped" : "",
-        isAirborne(player) ? "is-jumping" : ""
+      const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
+      const fighterClass = [
+        "battle-fighter",
+        player.dead ? "is-dead" : "",
+        isAirborne(player) ? "is-jumping" : "",
+        (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
+        (player.hitUntil || 0) > Date.now() ? "is-hit" : "",
+        player.direction === "left" ? "face-left" : ""
       ]
         .filter(Boolean)
         .join(" ");
+
       return `
-        <div class="${runnerClass} shared-runner" style="left:${runnerLeft(player.progress, camera)}; bottom:${sharedRunnerBottom(index)}px">
+        <div class="${fighterClass}" style="left:${player.x}%; bottom:${playerBottom(index)}px">
+          <div class="fighter-hp-bar">
+            <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
+          </div>
+          <div class="fighter-meta">
+            <span>${escapeHtml(player.name)}</span>
+            <strong>${Math.max(0, player.hp)} HP</strong>
+          </div>
           <div class="runner-avatar">${avatarSvg(avatar)}</div>
-          <div class="runner-label">${escapeHtml(player.name)}</div>
-          <div class="shared-runner-status">${effectLabel}</div>
-          <div class="shared-runner-rank">${formatRank(index)}</div>
+          <div class="fighter-status">${combatStatusText(player)}</div>
+          ${(player.attackingUntil || 0) > Date.now() && !player.dead ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
         </div>
       `;
     })
     .join("");
 
   el.track.innerHTML = `
-    <div class="shared-map">
-      ${sharedMapDecorations(camera)}
-      <div class="shared-map-header">
-        <div class="shared-map-copy">
-          <strong>夢幻森林競速場</strong>
-          <span>大家在同一張地圖跑跳競速，閃過障礙、踩彈簧、衝進終點傳送門</span>
+    <div class="battle-map">
+      ${arenaDecorations()}
+      <div class="battle-map-header">
+        <div class="battle-map-copy">
+          <strong>生日亂鬥競技場</strong>
+          <span>移動、跳躍、揮擊，把其他人打到血條歸零。最後活著的人獲勝。</span>
         </div>
-        <div class="shared-map-rank">CAM ${Math.round(camera)} / 76</div>
+        <div class="battle-chip">${alivePlayers.length} ALIVE</div>
       </div>
-      ${runnerMarkup}
+      ${fighterMarkup}
+      ${damageMarkup}
     </div>
   `;
 
-  const winners = players.slice(0, 3);
-  el.podium.innerHTML = winners
-    .map((player, index) => {
-      const avatar = getAvatarById(player.avatarId);
-      return `
-        <div class="podium-card" data-rank="${index + 1}">
-          <div class="avatar-badge">${avatarSvg(avatar)}</div>
-          <div>
-            <strong>${formatRank(index)} · ${escapeHtml(player.name)}</strong>
-            <span>${Math.round(player.progress)} / ${FINISH_DISTANCE}</span>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
+  renderPodium(sorted);
 
   if (appState.gamePhase === "countdown") {
-    el.raceSummary.textContent = "倒數開始，準備衝刺...";
+    el.raceSummary.textContent = "倒數中，準備開打...";
   } else if (appState.gamePhase === "finished" && appState.winnerId) {
     const winner = appState.players.get(appState.winnerId);
-    el.raceSummary.textContent = `${winner?.name || "有人"} 抵達終點城堡！`;
-  } else if (appState.gamePhase === "racing") {
-    el.raceSummary.textContent = "比賽進行中，大家正在全力衝刺...";
+    el.raceSummary.textContent = `${winner?.name || "有人"} 成為最後倖存者！`;
+  } else if (appState.gamePhase === "battle") {
+    el.raceSummary.textContent = `場上剩 ${alivePlayers.length} 人，亂鬥進行中！`;
   } else {
-    el.raceSummary.textContent = players.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始比賽";
+    el.raceSummary.textContent = sorted.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始亂鬥";
   }
 
   renderCountdownOverlay();
 }
 
-function renderPlayerPreview(state = appState.localPlayer) {
-  if (!state) return;
-  const avatar = getAvatarById(state.avatarId);
-  const camera = cameraForProgress(state.progress);
-  const runnerClass = [
-    "runner",
-    state.effect === "boost" ? "is-boosting" : "",
-    state.effect === "trap" ? "is-trapped" : "",
-    isAirborne(state) ? "is-jumping" : ""
+function renderPlayerPreview(player = appState.localPlayer) {
+  if (!player) return;
+  const avatar = getAvatarById(player.avatarId);
+  const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
+  const fighterClass = [
+    "battle-fighter",
+    player.dead ? "is-dead" : "",
+    isAirborne(player) ? "is-jumping" : "",
+    (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
+    (player.hitUntil || 0) > Date.now() ? "is-hit" : "",
+    player.direction === "left" ? "face-left" : ""
   ]
     .filter(Boolean)
     .join(" ");
 
   el.playerLanePreview.innerHTML = `
-    <div class="shared-map preview-map">
-      ${sharedMapDecorations(camera)}
-      <div class="${runnerClass} shared-runner preview-runner" style="left:${runnerLeft(state.progress, camera)}; bottom:60px">
+    <div class="battle-map preview-map">
+      ${arenaDecorations()}
+      <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:74px">
+        <div class="fighter-hp-bar">
+          <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
+        </div>
+        <div class="fighter-meta">
+          <span>${escapeHtml(player.name)}</span>
+          <strong>${Math.max(0, player.hp)} HP</strong>
+        </div>
         <div class="runner-avatar">${avatarSvg(avatar)}</div>
-        <div class="runner-label">${escapeHtml(state.name)}</div>
+        <div class="fighter-status">${combatStatusText(player)}</div>
       </div>
     </div>
   `;
@@ -506,274 +493,220 @@ function sendToAll(message) {
 }
 
 function broadcastState() {
+  pruneDamageBursts();
   const payload = {
     type: "state",
-    raceStarted: appState.raceStarted,
     winnerId: appState.winnerId,
     gamePhase: appState.gamePhase,
     countdownValue: appState.countdownValue,
     players: [...appState.players.values()]
   };
   sendToAll(payload);
-  renderHostTrack();
+  renderBattleArena([...appState.players.values()]);
 }
 
-function resetRace() {
+function createPlayer(messagePlayer) {
+  return {
+    id: messagePlayer.id,
+    name: messagePlayer.name.slice(0, 16) || "Player",
+    avatarId: messagePlayer.avatarId,
+    x: 18 + Math.random() * 64,
+    hp: MAX_HP,
+    dead: false,
+    direction: Math.random() > 0.5 ? "right" : "left",
+    joinedAt: Date.now(),
+    airborneUntil: 0,
+    attackingUntil: 0,
+    hitUntil: 0,
+    lastMoveAt: 0,
+    lastJumpAt: 0,
+    lastAttackAt: 0
+  };
+}
+
+function resetBattle() {
   clearTimeout(appState.countdownTimer);
   appState.countdownTimer = null;
-  appState.raceStarted = false;
   appState.winnerId = null;
   appState.gamePhase = "lobby";
   appState.countdownValue = "";
-  appState.players.forEach((player) => {
-    player.progress = 0;
-    player.effect = "ready";
-    player.lastHopAt = 0;
-    player.lastJumpAt = 0;
+  appState.damageBursts = [];
+  const players = [...appState.players.values()];
+  players.forEach((player, index) => {
+    player.hp = MAX_HP;
+    player.dead = false;
+    player.x = 14 + index * (68 / Math.max(1, players.length - 1 || 1));
+    player.direction = index % 2 ? "left" : "right";
     player.airborneUntil = 0;
+    player.attackingUntil = 0;
+    player.hitUntil = 0;
+    player.lastMoveAt = 0;
+    player.lastJumpAt = 0;
+    player.lastAttackAt = 0;
   });
   broadcastState();
 }
 
-function applyZoneEffects(nextProgress) {
-  const hitZone = laneZones.find((zone) => Math.abs(nextProgress - zone.position) <= 3);
-  if (!hitZone) {
-    return { progress: nextProgress, effect: "normal" };
-  }
-  if (hitZone.type === "boost") {
-    return { progress: Math.min(FINISH_DISTANCE, nextProgress + BOOST_STEP), effect: "boost" };
-  }
-  return { progress: Math.max(0, nextProgress - 5), effect: "trap" };
+function getAlivePlayers() {
+  return [...appState.players.values()].filter(isAlive);
 }
 
-function applyObstacleEffects(player, nextProgress, now) {
-  const obstacle = laneObstacles.find((item) => item.type !== "spring" && Math.abs(nextProgress - item.position) <= 2.7);
-  if (obstacle && !isAirborne(player, now)) {
-    return { progress: Math.max(0, nextProgress - 6), effect: "crash" };
-  }
-
-  const spring = laneObstacles.find((item) => item.type === "spring" && Math.abs(nextProgress - item.position) <= 2.7);
-  if (spring && isAirborne(player, now)) {
-    player.airborneUntil = Math.max(player.airborneUntil || 0, now + 260);
-    return { progress: Math.min(FINISH_DISTANCE, nextProgress + 5), effect: "boost" };
-  }
-
-  return { progress: nextProgress, effect: player.effect === "crash" ? "normal" : player.effect };
-}
-
-function handleRun(playerId) {
-  if (!appState.raceStarted || appState.gamePhase !== "racing" || appState.winnerId) return;
-  const player = appState.players.get(playerId);
-  if (!player) return;
-
-  const now = Date.now();
-  if (now - player.lastHopAt < HOP_COOLDOWN) return;
-  player.lastHopAt = now;
-
-  const baseProgress = Math.min(FINISH_DISTANCE, player.progress + BASE_STEP);
-  const obstacleAdjusted = applyObstacleEffects(player, baseProgress, now);
-  const updated = applyZoneEffects(obstacleAdjusted.progress);
-  player.progress = updated.progress;
-  player.effect = obstacleAdjusted.effect === "crash" ? "crash" : updated.effect;
-
-  if (player.progress >= FINISH_DISTANCE && !appState.winnerId) {
-    appState.winnerId = playerId;
-    appState.raceStarted = false;
+function maybeDeclareWinner() {
+  const alivePlayers = getAlivePlayers();
+  if (alivePlayers.length === 1 && appState.gamePhase === "battle") {
+    appState.winnerId = alivePlayers[0].id;
     appState.gamePhase = "finished";
-    appState.countdownValue = "";
-    sendToAll({ type: "winner", winnerId: playerId, winnerName: player.name });
+    sendToAll({ type: "winner", winnerId: alivePlayers[0].id, winnerName: alivePlayers[0].name });
     playVictoryFanfare();
+  } else if (!alivePlayers.length && appState.gamePhase === "battle") {
+    appState.winnerId = null;
+    appState.gamePhase = "finished";
   }
+}
 
+function applyMove(playerId, direction) {
+  if (appState.gamePhase !== "battle") return;
+  const player = appState.players.get(playerId);
+  if (!player || player.dead) return;
+  const now = Date.now();
+  if (now - player.lastMoveAt < MOVE_COOLDOWN || now < (player.hitUntil || 0)) return;
+  player.lastMoveAt = now;
+  player.direction = direction;
+  player.x = clampX(player.x + (direction === "left" ? -MOVE_STEP : MOVE_STEP));
   broadcastState();
 }
 
-function handleJump(playerId) {
-  if (!appState.raceStarted || appState.gamePhase !== "racing" || appState.winnerId) return;
+function applyJump(playerId) {
+  if (appState.gamePhase !== "battle") return;
   const player = appState.players.get(playerId);
-  if (!player) return;
-
+  if (!player || player.dead) return;
   const now = Date.now();
-  if (now - (player.lastJumpAt || 0) < JUMP_COOLDOWN) return;
-
+  if (now - player.lastJumpAt < JUMP_COOLDOWN || now < (player.hitUntil || 0)) return;
   player.lastJumpAt = now;
   player.airborneUntil = now + JUMP_AIR_TIME;
-  player.progress = Math.min(FINISH_DISTANCE, player.progress + 2);
-  player.effect = "jump";
+  broadcastState();
+}
 
-  const spring = laneObstacles.find((item) => item.type === "spring" && Math.abs(player.progress - item.position) <= 3.2);
-  if (spring) {
-    player.progress = Math.min(FINISH_DISTANCE, player.progress + 4);
-    player.airborneUntil = now + JUMP_AIR_TIME + 180;
-    player.effect = "boost";
+function applyAttack(playerId) {
+  if (appState.gamePhase !== "battle") return;
+  const attacker = appState.players.get(playerId);
+  if (!attacker || attacker.dead) return;
+  const now = Date.now();
+  if (now - attacker.lastAttackAt < ATTACK_COOLDOWN || now < (attacker.hitUntil || 0)) return;
+  attacker.lastAttackAt = now;
+  attacker.attackingUntil = now + 240;
+  let anyHit = false;
+
+  appState.players.forEach((target) => {
+    if (target.id === attacker.id || target.dead) return;
+    if (isAirborne(target, now) && !isAirborne(attacker, now)) return;
+    const directionCheck = attacker.direction === "right" ? target.x >= attacker.x : target.x <= attacker.x;
+    if (!directionCheck) return;
+    if (Math.abs(target.x - attacker.x) > ATTACK_RANGE) return;
+
+    const damage = Math.floor(ATTACK_DAMAGE_MIN + Math.random() * (ATTACK_DAMAGE_MAX - ATTACK_DAMAGE_MIN + 1));
+    target.hp = Math.max(0, target.hp - damage);
+    target.hitUntil = now + HIT_STUN;
+    target.direction = target.x >= attacker.x ? "right" : "left";
+    target.x = clampX(target.x + (attacker.direction === "right" ? 5.6 : -5.6));
+    addDamageBurst(target.x, damage, damage >= 24);
+    anyHit = true;
+
+    if (target.hp <= 0) {
+      target.dead = true;
+      target.airborneUntil = 0;
+      target.attackingUntil = 0;
+    }
+  });
+
+  if (anyHit) {
+    playHitTone();
   }
 
-  if (player.progress >= FINISH_DISTANCE && !appState.winnerId) {
-    appState.winnerId = playerId;
-    appState.raceStarted = false;
-    appState.gamePhase = "finished";
-    appState.countdownValue = "";
-    sendToAll({ type: "winner", winnerId: playerId, winnerName: player.name });
-    playVictoryFanfare();
-  }
-
+  maybeDeclareWinner();
   broadcastState();
 }
 
 function runCountdown(index = 0) {
   if (index >= COUNTDOWN_STEPS.length) {
     appState.countdownValue = "";
-    appState.gamePhase = "racing";
-    appState.raceStarted = true;
+    appState.gamePhase = "battle";
     broadcastState();
-    status("開跑！");
+    status("開打！");
     return;
   }
 
   appState.gamePhase = "countdown";
-  appState.raceStarted = false;
   appState.countdownValue = COUNTDOWN_STEPS[index];
   playCountdownTone(COUNTDOWN_STEPS[index]);
   broadcastState();
-  appState.countdownTimer = setTimeout(() => runCountdown(index + 1), COUNTDOWN_STEPS[index] === "GO!" ? 550 : 800);
+  appState.countdownTimer = setTimeout(() => runCountdown(index + 1), COUNTDOWN_STEPS[index] === "FIGHT!" ? 620 : 820);
 }
 
-function startCountdown() {
+function startBattleCountdown() {
   clearTimeout(appState.countdownTimer);
-  appState.winnerId = null;
-  appState.players.forEach((player) => {
-    player.progress = 0;
-    player.effect = "ready";
-    player.lastHopAt = 0;
-    player.lastJumpAt = 0;
-    player.airborneUntil = 0;
-  });
+  resetBattle();
   runCountdown(0);
-}
-
-function registerConnection(connection) {
-  connection.on("data", (message) => {
-    if (!message || typeof message !== "object") return;
-
-    if (message.type === "join") {
-      const player = {
-        id: message.player.id,
-        name: message.player.name.slice(0, 16) || "Player",
-        avatarId: message.player.avatarId,
-        progress: 0,
-        effect: "ready",
-        joinedAt: Date.now(),
-        lastHopAt: 0,
-        lastJumpAt: 0,
-        airborneUntil: 0
-      };
-      appState.players.set(player.id, player);
-      appState.connections.set(player.id, connection);
-      connection.send({
-        type: "joined",
-        raceStarted: appState.raceStarted,
-        winnerId: appState.winnerId,
-        gamePhase: appState.gamePhase,
-        countdownValue: appState.countdownValue,
-        player,
-        players: [...appState.players.values()]
-      });
-      broadcastState();
-      return;
-    }
-
-    if (message.type === "run") {
-      handleRun(message.playerId);
-    }
-
-    if (message.type === "jump") {
-      handleJump(message.playerId);
-    }
-  });
-
-  connection.on("close", () => {
-    const playerId = [...appState.connections.entries()].find(([, conn]) => conn === connection)?.[0];
-    if (playerId) {
-      appState.connections.delete(playerId);
-      appState.players.delete(playerId);
-      if (playerId === appState.winnerId) {
-        appState.winnerId = null;
-        appState.gamePhase = "lobby";
-      }
-      broadcastState();
-    }
-  });
-}
-
-function startHostMode() {
-  appState.mode = "host";
-  el.hostView.classList.remove("hidden");
-  el.playerView.classList.add("hidden");
-  status("正在建立房間...");
-
-  const peer = new window.Peer();
-  appState.peer = peer;
-
-  peer.on("open", async (id) => {
-    appState.peerId = id;
-    appState.joinCode = randomRoomCode(id);
-    appState.joinUrl = buildJoinUrl(id);
-    el.roomCode.textContent = appState.joinCode;
-    el.joinUrl.textContent = appState.joinUrl;
-    status("房間建立成功，讓大家掃 QR Code 加入。");
-    renderHostTrack();
-    await renderQrCode(appState.joinUrl);
-  });
-
-  peer.on("connection", (connection) => {
-    registerConnection(connection);
-  });
-
-  peer.on("error", (error) => {
-    status(`連線發生問題：${error.type || "unknown error"}`);
-  });
 }
 
 function updatePlayerStatus() {
   if (!appState.localPlayer) return;
-  const winner = appState.winnerId ? appState.localPlayer.id === appState.winnerId : false;
+  const me = appState.localPlayer;
+  const winner = appState.winnerId ? me.id === appState.winnerId : false;
 
   if (appState.gamePhase === "countdown") {
-    el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備好 RUN 和 JUMP。`;
-    el.boostButton.disabled = true;
-    el.jumpButton.disabled = true;
+    el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備左右移動、跳躍、攻擊。`;
     el.playerStatusChip.textContent = "COUNTDOWN";
     el.playerActionChip.textContent = `準備 ${appState.countdownValue || ""}`;
+    el.leftButton.disabled = true;
+    el.rightButton.disabled = true;
+    el.jumpButton.disabled = true;
+    el.attackButton.disabled = true;
   } else if (appState.gamePhase === "lobby") {
-    el.controllerHint.textContent = "等待房主開始比賽。開跑後用 RUN 衝刺，用 JUMP 跳過障礙。";
-    el.boostButton.disabled = true;
-    el.jumpButton.disabled = true;
+    el.controllerHint.textContent = "等待房主開始亂鬥。開始後用左右移動、跳躍和攻擊把別人打下去。";
     el.playerStatusChip.textContent = "WAITING";
-    el.playerActionChip.textContent = "等待開跑";
+    el.playerActionChip.textContent = "等待開打";
+    el.leftButton.disabled = true;
+    el.rightButton.disabled = true;
+    el.jumpButton.disabled = true;
+    el.attackButton.disabled = true;
   } else if (winner) {
-    el.controllerHint.textContent = "你是冠軍！等房主重設後可以再玩一局。";
-    el.boostButton.disabled = true;
-    el.jumpButton.disabled = true;
+    el.controllerHint.textContent = "你是最後的倖存者！等房主重設後可以再玩一局。";
     el.playerStatusChip.textContent = "WINNER";
-    el.playerActionChip.textContent = "你第一名";
-  } else if (appState.winnerId) {
-    const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
-    el.controllerHint.textContent = `${winnerName || "有人"} 已經先到終點城堡，等房主重設下一局。`;
-    el.boostButton.disabled = true;
+    el.playerActionChip.textContent = "你活到最後";
+    el.leftButton.disabled = true;
+    el.rightButton.disabled = true;
     el.jumpButton.disabled = true;
+    el.attackButton.disabled = true;
+  } else if (me.dead) {
+    el.controllerHint.textContent = "你已經被淘汰了，等房主重設下一局。";
+    el.playerStatusChip.textContent = "DEAD";
+    el.playerActionChip.textContent = "已淘汰";
+    el.leftButton.disabled = true;
+    el.rightButton.disabled = true;
+    el.jumpButton.disabled = true;
+    el.attackButton.disabled = true;
+  } else if (appState.gamePhase === "finished") {
+    const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
+    el.controllerHint.textContent = `${winnerName || "有人"} 活到最後，等房主重設下一局。`;
     el.playerStatusChip.textContent = "FINISHED";
-    el.playerActionChip.textContent = `${winnerName || "有人"} 已到終點`;
+    el.playerActionChip.textContent = `${winnerName || "有人"} 獲勝`;
+    el.leftButton.disabled = true;
+    el.rightButton.disabled = true;
+    el.jumpButton.disabled = true;
+    el.attackButton.disabled = true;
   } else {
-    el.controllerHint.textContent = "RUN 衝刺前進，JUMP 跳過木箱與尖刺，踩上彈簧會飛得更遠。";
-    el.boostButton.disabled = false;
+    el.controllerHint.textContent = "左右移動接近對手，跳躍躲招，按 ATTACK 打出傷害。";
+    el.playerStatusChip.textContent = "BATTLE";
+    el.playerActionChip.textContent = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
+    el.leftButton.disabled = false;
+    el.rightButton.disabled = false;
     el.jumpButton.disabled = false;
-    el.playerStatusChip.textContent = "RACING";
-    el.playerActionChip.textContent = isAirborne(appState.localPlayer) ? "空中跳躍中" : "全力前進";
+    el.attackButton.disabled = false;
   }
 }
 
 function applyRemoteState(message) {
-  appState.raceStarted = message.raceStarted;
   appState.winnerId = message.winnerId;
   appState.gamePhase = message.gamePhase || "lobby";
   appState.countdownValue = message.countdownValue || "";
@@ -787,23 +720,95 @@ function applyRemoteState(message) {
   updatePlayerStatus();
 }
 
+function registerConnection(connection) {
+  connection.on("data", (message) => {
+    if (!message || typeof message !== "object") return;
+
+    if (message.type === "join") {
+      const player = createPlayer(message.player);
+      appState.players.set(player.id, player);
+      appState.connections.set(player.id, connection);
+      connection.send({
+        type: "joined",
+        winnerId: appState.winnerId,
+        gamePhase: appState.gamePhase,
+        countdownValue: appState.countdownValue,
+        player,
+        players: [...appState.players.values()]
+      });
+      broadcastState();
+      return;
+    }
+
+    if (message.type === "move") {
+      applyMove(message.playerId, message.direction);
+    }
+
+    if (message.type === "jump") {
+      applyJump(message.playerId);
+    }
+
+    if (message.type === "attack") {
+      applyAttack(message.playerId);
+    }
+  });
+
+  connection.on("close", () => {
+    const playerId = [...appState.connections.entries()].find(([, conn]) => conn === connection)?.[0];
+    if (playerId) {
+      appState.connections.delete(playerId);
+      appState.players.delete(playerId);
+      maybeDeclareWinner();
+      broadcastState();
+    }
+  });
+}
+
+function startHostMode() {
+  appState.mode = "host";
+  el.hostView.classList.remove("hidden");
+  el.playerView.classList.add("hidden");
+  status("正在建立戰場...");
+
+  const peer = new window.Peer();
+  appState.peer = peer;
+
+  peer.on("open", async (id) => {
+    appState.peerId = id;
+    appState.joinCode = randomRoomCode(id);
+    appState.joinUrl = buildJoinUrl(id);
+    el.roomCode.textContent = appState.joinCode;
+    el.joinUrl.textContent = appState.joinUrl;
+    status("戰場建立成功，讓大家掃 QR Code 加入。");
+    renderBattleArena([]);
+    await renderQrCode(appState.joinUrl);
+  });
+
+  peer.on("connection", (connection) => {
+    registerConnection(connection);
+  });
+
+  peer.on("error", (error) => {
+    status(`連線發生問題：${error.type || "unknown error"}`);
+  });
+}
+
 function startPlayerMode(hostId) {
   appState.mode = "player";
   el.hostView.classList.add("hidden");
   el.playerView.classList.remove("hidden");
   setupAvatarPicker();
-  status("輸入名字、選頭像後，就能加入房間。");
+  status("輸入名字、選頭像後，就能加入戰場。");
 
   const peer = new window.Peer();
   appState.peer = peer;
-  appState.joinCode = hostId;
 
   peer.on("open", () => {
     const connection = peer.connect(hostId, { reliable: true });
     appState.hostConnection = connection;
 
     connection.on("open", () => {
-      status("已連上房主，準備加入房間。");
+      status("已連上房主，準備加入戰場。");
       el.joinButton.disabled = false;
     });
 
@@ -819,10 +824,10 @@ function startPlayerMode(hostId) {
         appState.winnerId = message.winnerId;
         el.joinPanel.classList.add("hidden");
         el.controllerPanel.classList.remove("hidden");
-        el.playerGreeting.textContent = `${message.player.name}，準備衝刺`;
+        el.playerGreeting.textContent = `${message.player.name}，準備開打`;
         renderPlayerPreview(message.player);
         updatePlayerStatus();
-        status("加入成功，等待比賽開始。");
+        status("加入成功，等待亂鬥開始。");
       }
 
       if (message.type === "state") {
@@ -839,8 +844,10 @@ function startPlayerMode(hostId) {
     connection.on("close", () => {
       appState.joinRequested = false;
       status("與房主的連線中斷了，請重新掃碼加入。");
-      el.boostButton.disabled = true;
+      el.leftButton.disabled = true;
+      el.rightButton.disabled = true;
       el.jumpButton.disabled = true;
+      el.attackButton.disabled = true;
       el.joinButton.disabled = true;
     });
   });
@@ -867,12 +874,12 @@ function wireEvents() {
       status("至少要 2 位玩家才能開始。");
       return;
     }
-    startCountdown();
-    status("倒數開始！");
+    startBattleCountdown();
+    status("倒數開始，準備開打！");
   });
 
   el.resetRaceButton.addEventListener("click", () => {
-    resetRace();
+    resetBattle();
     status("本局已重設，玩家可以準備下一場。");
   });
 
@@ -895,28 +902,37 @@ function wireEvents() {
     status("正在送出加入請求...");
   });
 
-  const run = () => {
-    getAudioContext();
-    if (!appState.hostConnection?.open || !appState.localPlayer || el.boostButton.disabled) return;
+  const sendMove = (direction) => {
+    if (!appState.hostConnection?.open || !appState.localPlayer || el.leftButton.disabled) return;
     const now = Date.now();
-    if (now - appState.lastLocalHopAt < HOP_COOLDOWN) return;
-    appState.lastLocalHopAt = now;
-    appState.hostConnection.send({ type: "run", playerId: appState.playerId });
-    playTone(520, 0.04, "square", 0.03);
+    if (now - appState.lastLocalMoveAt < MOVE_COOLDOWN) return;
+    appState.lastLocalMoveAt = now;
+    appState.hostConnection.send({ type: "move", playerId: appState.playerId, direction });
+    playTone(direction === "left" ? 260 : 280, 0.03, "square", 0.03);
   };
 
-  const jump = () => {
-    getAudioContext();
+  const sendJump = () => {
     if (!appState.hostConnection?.open || !appState.localPlayer || el.jumpButton.disabled) return;
     const now = Date.now();
     if (now - appState.lastLocalJumpAt < JUMP_COOLDOWN) return;
     appState.lastLocalJumpAt = now;
     appState.hostConnection.send({ type: "jump", playerId: appState.playerId });
-    playTone(760, 0.06, "square", 0.04);
+    playTone(720, 0.05, "square", 0.04);
   };
 
-  el.boostButton.addEventListener("pointerdown", run);
-  el.jumpButton.addEventListener("pointerdown", jump);
+  const sendAttack = () => {
+    if (!appState.hostConnection?.open || !appState.localPlayer || el.attackButton.disabled) return;
+    const now = Date.now();
+    if (now - appState.lastLocalAttackAt < ATTACK_COOLDOWN) return;
+    appState.lastLocalAttackAt = now;
+    appState.hostConnection.send({ type: "attack", playerId: appState.playerId });
+    playTone(340, 0.07, "sawtooth", 0.05);
+  };
+
+  el.leftButton.addEventListener("pointerdown", () => sendMove("left"));
+  el.rightButton.addEventListener("pointerdown", () => sendMove("right"));
+  el.jumpButton.addEventListener("pointerdown", sendJump);
+  el.attackButton.addEventListener("pointerdown", sendAttack);
 }
 
 function init() {
