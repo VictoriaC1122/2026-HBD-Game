@@ -2,6 +2,8 @@ const FINISH_DISTANCE = 100;
 const BOOST_STEP = 7;
 const BASE_STEP = 3;
 const HOP_COOLDOWN = 125;
+const JUMP_COOLDOWN = 620;
+const JUMP_AIR_TIME = 720;
 const COUNTDOWN_STEPS = ["3", "2", "1", "GO!"];
 const laneThemes = ["sky", "sunset", "night", "cave"];
 
@@ -27,6 +29,14 @@ const laneZones = [
   { position: 74, type: "trap", icon: "!" }
 ];
 
+const laneObstacles = [
+  { position: 17, type: "crate" },
+  { position: 34, type: "spike" },
+  { position: 51, type: "spring" },
+  { position: 67, type: "crate" },
+  { position: 83, type: "spike" }
+];
+
 const appState = {
   mode: "host",
   peer: null,
@@ -47,7 +57,8 @@ const appState = {
   countdownTimer: null,
   audioContext: null,
   joinRequested: false,
-  lastLocalHopAt: 0
+  lastLocalHopAt: 0,
+  lastLocalJumpAt: 0
 };
 
 const el = {
@@ -78,6 +89,7 @@ const el = {
   playerGreeting: document.querySelector("#playerGreeting"),
   playerLanePreview: document.querySelector("#playerLanePreview"),
   boostButton: document.querySelector("#boostButton"),
+  jumpButton: document.querySelector("#jumpButton"),
   controllerHint: document.querySelector("#controllerHint")
 };
 
@@ -268,36 +280,62 @@ function setupAvatarPicker() {
 }
 
 function worldOffset(progress) {
-  return Math.min(220, Math.round(progress * 2.1));
+  return Math.min(420, Math.round(progress * 4.2));
 }
 
-function runnerLeft(progress) {
-  return `${Math.min(87, 10 + progress * 0.78)}%`;
+function cameraForProgress(progress) {
+  return Math.max(0, Math.min(FINISH_DISTANCE - 24, progress - 24));
 }
 
-function laneDecorations(theme, progress) {
-  const offset = worldOffset(progress);
-  const cloudOffset = Math.round(offset * 0.35);
-  const hillOffset = Math.round(offset * 0.6);
-  const brickOffset = Math.round(offset * 0.95);
+function viewportLeft(progress, camera) {
+  return Math.max(4, Math.min(90, 10 + (progress - camera) * 2.6));
+}
+
+function runnerLeft(progress, camera) {
+  return `${viewportLeft(progress, camera)}%`;
+}
+
+function isAirborne(player, now = Date.now()) {
+  return (player.airborneUntil || 0) > now;
+}
+
+function sharedRunnerBottom(index) {
+  return 52 + (index % 5) * 18;
+}
+
+function sharedMapDecorations(camera) {
+  const offset = worldOffset(camera);
+  const cloudOffset = Math.round(offset * 0.24);
+  const hillOffset = Math.round(offset * 0.5);
+  const treeOffset = Math.round(offset * 0.92);
+
   return `
-    <div class="lane-backdrop">
-      <div class="parallax-layer layer-clouds" style="transform:translateX(-${cloudOffset}px)"></div>
-      <div class="parallax-layer layer-hills" style="transform:translateX(-${hillOffset}px)"></div>
-      <div class="parallax-layer layer-bricks" style="transform:translateX(-${brickOffset}px)"></div>
-      <div class="ground-strip"></div>
-      <div class="pixel-pipe" style="left:18%"></div>
-      <div class="pixel-pipe" style="left:48%"></div>
-      <div class="pixel-pipe" style="left:69%"></div>
+    <div class="shared-backdrop">
+      <div class="fantasy-layer fantasy-sky"></div>
+      <div class="fantasy-layer fantasy-clouds" style="transform:translateX(-${cloudOffset}px)"></div>
+      <div class="fantasy-layer fantasy-hills" style="transform:translateX(-${hillOffset}px)"></div>
+      <div class="fantasy-layer fantasy-trees" style="transform:translateX(-${treeOffset}px)"></div>
+      <div class="fantasy-layer fantasy-islands" style="transform:translateX(-${Math.round(hillOffset * 0.8)}px)"></div>
+      <div class="forest-ground"></div>
+      <div class="forest-shadow"></div>
+      <div class="forest-mushroom giant"></div>
+      <div class="forest-mushroom mini"></div>
+      <div class="forest-crystal crystal-a"></div>
+      <div class="forest-crystal crystal-b"></div>
       ${laneZones
         .map(
           (zone) => `
-            <div class="zone ${zone.type}" style="left:${zone.position}%">${zone.icon}</div>
+            <div class="forest-zone ${zone.type}" style="left:${viewportLeft(zone.position, camera)}%">${zone.icon}</div>
           `
         )
         .join("")}
-      <div class="finish-flag"></div>
-      <div class="finish-castle"></div>
+      ${laneObstacles
+        .map(
+          (obstacle) => `<div class="forest-obstacle ${obstacle.type}" style="left:${viewportLeft(obstacle.position, camera)}%"></div>`
+        )
+        .join("")}
+      <div class="finish-tree" style="left:${viewportLeft(FINISH_DISTANCE, camera)}%"></div>
+      <div class="finish-portal" style="left:${viewportLeft(FINISH_DISTANCE, camera)}%"></div>
     </div>
   `;
 }
@@ -331,17 +369,12 @@ function renderHostTrack() {
 
   if (!players.length) {
     el.track.innerHTML = `
-      <div class="lane theme-sky">
-        <div class="lane-stage">
-          ${laneDecorations("sky", 0)}
-          <div class="lane-header">
-            <div class="lane-player">
-              <div class="lane-meta">
-                <strong>等待玩家加入</strong>
-                <span>掃描 QR Code 後就會出現在舞台上</span>
-              </div>
-            </div>
-            <div class="lane-rank">LOBBY</div>
+      <div class="shared-map">
+        ${sharedMapDecorations(0)}
+        <div class="shared-map-header">
+          <div class="shared-map-copy">
+            <strong>等待玩家加入</strong>
+            <span>掃描 QR Code 後，所有玩家會一起在同一張奇幻森林地圖裡開跑</span>
           </div>
         </div>
       </div>
@@ -354,43 +387,54 @@ function renderHostTrack() {
   }
 
   el.startRaceButton.disabled = players.length < 2 || appState.gamePhase === "countdown";
+  const leaderProgress = players[0]?.progress || 0;
+  const camera = cameraForProgress(leaderProgress);
 
-  el.track.innerHTML = players
+  const runnerMarkup = players
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
-      const theme = themeForIndex(index);
       const effectLabel =
-        player.effect === "boost" ? "STAR BOOST" : player.effect === "trap" ? "MUD TRAP" : "RUNNING";
+        player.effect === "boost"
+          ? "STAR BOOST"
+          : player.effect === "trap"
+            ? "MUD TRAP"
+            : player.effect === "crash"
+              ? "OUCH!"
+              : isAirborne(player)
+                ? "JUMPING"
+                : "RUNNING";
       const runnerClass = [
         "runner",
         player.effect === "boost" ? "is-boosting" : "",
-        player.effect === "trap" ? "is-trapped" : ""
+        player.effect === "trap" ? "is-trapped" : "",
+        isAirborne(player) ? "is-jumping" : ""
       ]
         .filter(Boolean)
         .join(" ");
       return `
-        <div class="lane theme-${theme}">
-          <div class="lane-stage">
-            ${laneDecorations(theme, player.progress)}
-            <div class="lane-header">
-              <div class="lane-player">
-                <div class="avatar-badge">${avatarSvg(avatar)}</div>
-                <div class="lane-meta">
-                  <strong>${escapeHtml(player.name)}</strong>
-                  <span>${effectLabel} · ${Math.round(player.progress)} / ${FINISH_DISTANCE}</span>
-                </div>
-              </div>
-              <div class="lane-rank">${formatRank(index)}</div>
-            </div>
-            <div class="${runnerClass}" style="left:${runnerLeft(player.progress)}">
-              <div class="runner-avatar">${avatarSvg(avatar)}</div>
-              <div class="runner-label">${escapeHtml(player.name)}</div>
-            </div>
-          </div>
+        <div class="${runnerClass} shared-runner" style="left:${runnerLeft(player.progress, camera)}; bottom:${sharedRunnerBottom(index)}px">
+          <div class="runner-avatar">${avatarSvg(avatar)}</div>
+          <div class="runner-label">${escapeHtml(player.name)}</div>
+          <div class="shared-runner-status">${effectLabel}</div>
+          <div class="shared-runner-rank">${formatRank(index)}</div>
         </div>
       `;
     })
     .join("");
+
+  el.track.innerHTML = `
+    <div class="shared-map">
+      ${sharedMapDecorations(camera)}
+      <div class="shared-map-header">
+        <div class="shared-map-copy">
+          <strong>夢幻森林競速場</strong>
+          <span>大家在同一張地圖跑跳競速，閃過障礙、踩彈簧、衝進終點傳送門</span>
+        </div>
+        <div class="shared-map-rank">CAM ${Math.round(camera)} / 76</div>
+      </div>
+      ${runnerMarkup}
+    </div>
+  `;
 
   const winners = players.slice(0, 3);
   el.podium.innerHTML = winners
@@ -425,23 +469,22 @@ function renderHostTrack() {
 function renderPlayerPreview(state = appState.localPlayer) {
   if (!state) return;
   const avatar = getAvatarById(state.avatarId);
-  const theme = "sky";
+  const camera = cameraForProgress(state.progress);
   const runnerClass = [
     "runner",
     state.effect === "boost" ? "is-boosting" : "",
-    state.effect === "trap" ? "is-trapped" : ""
+    state.effect === "trap" ? "is-trapped" : "",
+    isAirborne(state) ? "is-jumping" : ""
   ]
     .filter(Boolean)
     .join(" ");
 
   el.playerLanePreview.innerHTML = `
-    <div class="lane theme-${theme}">
-      <div class="lane-stage">
-        ${laneDecorations(theme, state.progress)}
-        <div class="${runnerClass}" style="left:${runnerLeft(state.progress)}">
-          <div class="runner-avatar">${avatarSvg(avatar)}</div>
-          <div class="runner-label">${escapeHtml(state.name)}</div>
-        </div>
+    <div class="shared-map preview-map">
+      ${sharedMapDecorations(camera)}
+      <div class="${runnerClass} shared-runner preview-runner" style="left:${runnerLeft(state.progress, camera)}; bottom:60px">
+        <div class="runner-avatar">${avatarSvg(avatar)}</div>
+        <div class="runner-label">${escapeHtml(state.name)}</div>
       </div>
     </div>
   `;
@@ -479,6 +522,8 @@ function resetRace() {
     player.progress = 0;
     player.effect = "ready";
     player.lastHopAt = 0;
+    player.lastJumpAt = 0;
+    player.airborneUntil = 0;
   });
   broadcastState();
 }
@@ -494,7 +539,22 @@ function applyZoneEffects(nextProgress) {
   return { progress: Math.max(0, nextProgress - 5), effect: "trap" };
 }
 
-function handleHop(playerId) {
+function applyObstacleEffects(player, nextProgress, now) {
+  const obstacle = laneObstacles.find((item) => item.type !== "spring" && Math.abs(nextProgress - item.position) <= 2.7);
+  if (obstacle && !isAirborne(player, now)) {
+    return { progress: Math.max(0, nextProgress - 6), effect: "crash" };
+  }
+
+  const spring = laneObstacles.find((item) => item.type === "spring" && Math.abs(nextProgress - item.position) <= 2.7);
+  if (spring && isAirborne(player, now)) {
+    player.airborneUntil = Math.max(player.airborneUntil || 0, now + 260);
+    return { progress: Math.min(FINISH_DISTANCE, nextProgress + 5), effect: "boost" };
+  }
+
+  return { progress: nextProgress, effect: player.effect === "crash" ? "normal" : player.effect };
+}
+
+function handleRun(playerId) {
   if (!appState.raceStarted || appState.gamePhase !== "racing" || appState.winnerId) return;
   const player = appState.players.get(playerId);
   if (!player) return;
@@ -504,9 +564,42 @@ function handleHop(playerId) {
   player.lastHopAt = now;
 
   const baseProgress = Math.min(FINISH_DISTANCE, player.progress + BASE_STEP);
-  const updated = applyZoneEffects(baseProgress);
+  const obstacleAdjusted = applyObstacleEffects(player, baseProgress, now);
+  const updated = applyZoneEffects(obstacleAdjusted.progress);
   player.progress = updated.progress;
-  player.effect = updated.effect;
+  player.effect = obstacleAdjusted.effect === "crash" ? "crash" : updated.effect;
+
+  if (player.progress >= FINISH_DISTANCE && !appState.winnerId) {
+    appState.winnerId = playerId;
+    appState.raceStarted = false;
+    appState.gamePhase = "finished";
+    appState.countdownValue = "";
+    sendToAll({ type: "winner", winnerId: playerId, winnerName: player.name });
+    playVictoryFanfare();
+  }
+
+  broadcastState();
+}
+
+function handleJump(playerId) {
+  if (!appState.raceStarted || appState.gamePhase !== "racing" || appState.winnerId) return;
+  const player = appState.players.get(playerId);
+  if (!player) return;
+
+  const now = Date.now();
+  if (now - (player.lastJumpAt || 0) < JUMP_COOLDOWN) return;
+
+  player.lastJumpAt = now;
+  player.airborneUntil = now + JUMP_AIR_TIME;
+  player.progress = Math.min(FINISH_DISTANCE, player.progress + 2);
+  player.effect = "jump";
+
+  const spring = laneObstacles.find((item) => item.type === "spring" && Math.abs(player.progress - item.position) <= 3.2);
+  if (spring) {
+    player.progress = Math.min(FINISH_DISTANCE, player.progress + 4);
+    player.airborneUntil = now + JUMP_AIR_TIME + 180;
+    player.effect = "boost";
+  }
 
   if (player.progress >= FINISH_DISTANCE && !appState.winnerId) {
     appState.winnerId = playerId;
@@ -545,6 +638,8 @@ function startCountdown() {
     player.progress = 0;
     player.effect = "ready";
     player.lastHopAt = 0;
+    player.lastJumpAt = 0;
+    player.airborneUntil = 0;
   });
   runCountdown(0);
 }
@@ -561,7 +656,9 @@ function registerConnection(connection) {
         progress: 0,
         effect: "ready",
         joinedAt: Date.now(),
-        lastHopAt: 0
+        lastHopAt: 0,
+        lastJumpAt: 0,
+        airborneUntil: 0
       };
       appState.players.set(player.id, player);
       appState.connections.set(player.id, connection);
@@ -578,8 +675,12 @@ function registerConnection(connection) {
       return;
     }
 
-    if (message.type === "hop") {
-      handleHop(message.playerId);
+    if (message.type === "run") {
+      handleRun(message.playerId);
+    }
+
+    if (message.type === "jump") {
+      handleJump(message.playerId);
     }
   });
 
@@ -631,21 +732,26 @@ function updatePlayerStatus() {
   const winner = appState.winnerId ? appState.localPlayer.id === appState.winnerId : false;
 
   if (appState.gamePhase === "countdown") {
-    el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備好狂按 RUN。`;
+    el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備好 RUN 和 JUMP。`;
     el.boostButton.disabled = true;
+    el.jumpButton.disabled = true;
   } else if (appState.gamePhase === "lobby") {
-    el.controllerHint.textContent = "等待房主開始比賽，倒數結束後狂按按鈕衝向終點。";
+    el.controllerHint.textContent = "等待房主開始比賽。開跑後用 RUN 衝刺，用 JUMP 跳過障礙。";
     el.boostButton.disabled = true;
+    el.jumpButton.disabled = true;
   } else if (winner) {
     el.controllerHint.textContent = "你是冠軍！等房主重設後可以再玩一局。";
     el.boostButton.disabled = true;
+    el.jumpButton.disabled = true;
   } else if (appState.winnerId) {
     const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
     el.controllerHint.textContent = `${winnerName || "有人"} 已經先到終點城堡，等房主重設下一局。`;
     el.boostButton.disabled = true;
+    el.jumpButton.disabled = true;
   } else {
-    el.controllerHint.textContent = "現在狂按 RUN，踩到星星會暴衝，踩進泥巴會慢下來。";
+    el.controllerHint.textContent = "RUN 衝刺前進，JUMP 跳過木箱與尖刺，踩上彈簧會飛得更遠。";
     el.boostButton.disabled = false;
+    el.jumpButton.disabled = false;
   }
 }
 
@@ -717,6 +823,7 @@ function startPlayerMode(hostId) {
       appState.joinRequested = false;
       status("與房主的連線中斷了，請重新掃碼加入。");
       el.boostButton.disabled = true;
+      el.jumpButton.disabled = true;
       el.joinButton.disabled = true;
     });
   });
@@ -771,17 +878,28 @@ function wireEvents() {
     status("正在送出加入請求...");
   });
 
-  const hop = () => {
+  const run = () => {
     getAudioContext();
     if (!appState.hostConnection?.open || !appState.localPlayer || el.boostButton.disabled) return;
     const now = Date.now();
     if (now - appState.lastLocalHopAt < HOP_COOLDOWN) return;
     appState.lastLocalHopAt = now;
-    appState.hostConnection.send({ type: "hop", playerId: appState.playerId });
+    appState.hostConnection.send({ type: "run", playerId: appState.playerId });
     playTone(520, 0.04, "square", 0.03);
   };
 
-  el.boostButton.addEventListener("pointerdown", hop);
+  const jump = () => {
+    getAudioContext();
+    if (!appState.hostConnection?.open || !appState.localPlayer || el.jumpButton.disabled) return;
+    const now = Date.now();
+    if (now - appState.lastLocalJumpAt < JUMP_COOLDOWN) return;
+    appState.lastLocalJumpAt = now;
+    appState.hostConnection.send({ type: "jump", playerId: appState.playerId });
+    playTone(760, 0.06, "square", 0.04);
+  };
+
+  el.boostButton.addEventListener("pointerdown", run);
+  el.jumpButton.addEventListener("pointerdown", jump);
 }
 
 function init() {

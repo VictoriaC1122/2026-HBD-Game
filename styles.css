@@ -393,6 +393,352 @@ button {
   gap: 14px;
 }
 
+.track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 12.5%, transparent 12.5% 25%, rgba(255, 255, 255, 0.06) 25% 37.5%, transparent 37.5% 50%, rgba(255, 255, 255, 0.06) 50% 62.5%, transparent 62.5% 75%, rgba(255, 255, 255, 0.06) 75% 87.5%, transparent 87.5% 100%);
+}
+
+.shared-map {
+  position: relative;
+  min-height: 380px;
+  overflow: hidden;
+  border: 4px solid var(--pixel-border);
+  background: linear-gradient(180deg, #b9f0ff 0%, #9fe0ff 24%, #b8f3cf 60%, #84cf77 60%, #567947 100%);
+}
+
+.preview-map {
+  min-height: 180px;
+}
+
+.shared-backdrop,
+.fantasy-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.fantasy-sky {
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.8) 0 28px, transparent 29px),
+    radial-gradient(circle at 82% 14%, rgba(255, 241, 179, 0.9) 0 42px, transparent 43px),
+    linear-gradient(180deg, rgba(255,255,255,0.15), transparent 55%);
+}
+
+.fantasy-clouds {
+  background:
+    radial-gradient(circle at 10% 26%, rgba(255,255,255,0.95) 0 22px, transparent 23px),
+    radial-gradient(circle at 14% 24%, rgba(255,255,255,0.95) 0 26px, transparent 27px),
+    radial-gradient(circle at 48% 18%, rgba(255,255,255,0.9) 0 18px, transparent 19px),
+    radial-gradient(circle at 52% 18%, rgba(255,255,255,0.9) 0 24px, transparent 25px),
+    radial-gradient(circle at 84% 28%, rgba(255,255,255,0.92) 0 22px, transparent 23px),
+    radial-gradient(circle at 88% 26%, rgba(255,255,255,0.92) 0 26px, transparent 27px);
+}
+
+.fantasy-hills {
+  background:
+    radial-gradient(circle at 12% 100%, #7ecb90 0 18%, transparent 18.5%),
+    radial-gradient(circle at 34% 100%, #8dd99f 0 16%, transparent 16.5%),
+    radial-gradient(circle at 62% 100%, #75c388 0 18%, transparent 18.5%),
+    radial-gradient(circle at 84% 100%, #93dca0 0 16%, transparent 16.5%);
+}
+
+.fantasy-trees {
+  background:
+    linear-gradient(#4f7f3b 0 0) 8% 58% / 18px 28% no-repeat,
+    radial-gradient(circle at 9% 53%, #9cf290 0 30px, transparent 31px),
+    linear-gradient(#5d8d44 0 0) 26% 55% / 18px 31% no-repeat,
+    radial-gradient(circle at 27% 50%, #b4f7a2 0 32px, transparent 33px),
+    linear-gradient(#5c8649 0 0) 71% 57% / 18px 29% no-repeat,
+    radial-gradient(circle at 72% 52%, #8fe887 0 34px, transparent 35px),
+    linear-gradient(#4e7f43 0 0) 90% 56% / 18px 30% no-repeat,
+    radial-gradient(circle at 91% 51%, #a4ef95 0 32px, transparent 33px);
+}
+
+.fantasy-islands {
+  background:
+    linear-gradient(#dff8ff 0 0) 20% 24% / 108px 18px no-repeat,
+    linear-gradient(#7fc27e 0 0) 20% 31% / 108px 22px no-repeat,
+    linear-gradient(#e8fbff 0 0) 66% 18% / 128px 18px no-repeat,
+    linear-gradient(#81c47f 0 0) 66% 25% / 128px 22px no-repeat,
+    linear-gradient(#f0ffff 0 0) 83% 34% / 88px 15px no-repeat,
+    linear-gradient(#8bcf85 0 0) 83% 40% / 88px 18px no-repeat;
+  opacity: 0.9;
+}
+
+.forest-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 92px;
+  background:
+    linear-gradient(180deg, #6edb73 0 18px, #4da851 18px 30px, #8c5a37 30px 100%);
+}
+
+.forest-shadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 76px;
+  height: 18px;
+  background: linear-gradient(180deg, rgba(24, 34, 56, 0.22), transparent);
+}
+
+.forest-mushroom,
+.forest-crystal,
+.forest-zone,
+.forest-obstacle,
+.finish-tree,
+.finish-portal,
+.shared-map-header,
+.shared-runner-status,
+.shared-runner-rank {
+  position: absolute;
+}
+
+.forest-mushroom {
+  bottom: 76px;
+  width: 72px;
+  height: 84px;
+}
+
+.forest-mushroom::before {
+  content: "";
+  position: absolute;
+  left: 24px;
+  bottom: 0;
+  width: 24px;
+  height: 46px;
+  border-radius: 14px;
+  background: #f8eedb;
+  border: 3px solid rgba(32, 40, 28, 0.85);
+}
+
+.forest-mushroom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 72px;
+  height: 48px;
+  border-radius: 40px 40px 26px 26px;
+  background:
+    radial-gradient(circle at 18px 16px, #fff 0 5px, transparent 6px),
+    radial-gradient(circle at 38px 12px, #fff 0 6px, transparent 7px),
+    radial-gradient(circle at 54px 20px, #fff 0 5px, transparent 6px),
+    linear-gradient(180deg, #ff8dac, #f04f78);
+  border: 3px solid rgba(32, 40, 28, 0.85);
+}
+
+.forest-mushroom.giant {
+  left: 8%;
+}
+
+.forest-mushroom.mini {
+  left: 73%;
+  transform: scale(0.8);
+}
+
+.forest-crystal {
+  bottom: 82px;
+  width: 40px;
+  height: 58px;
+  clip-path: polygon(50% 0%, 100% 28%, 84% 100%, 16% 100%, 0 28%);
+  background: linear-gradient(180deg, #b8fbff, #4dc7f7);
+  border: 3px solid rgba(32, 40, 28, 0.85);
+}
+
+.crystal-a {
+  left: 22%;
+}
+
+.crystal-b {
+  left: 88%;
+  transform: scale(0.82);
+}
+
+.forest-zone,
+.forest-obstacle,
+.finish-tree,
+.finish-portal {
+  bottom: 78px;
+  transform: translateX(-50%);
+}
+
+.forest-zone {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  font-size: 20px;
+  border: 3px solid rgba(32, 40, 28, 0.9);
+}
+
+.forest-zone.boost {
+  background: linear-gradient(180deg, #fff2a0, #ffc952);
+}
+
+.forest-zone.trap {
+  background: linear-gradient(180deg, #8f6a57, #684437);
+  color: #fff;
+}
+
+.forest-obstacle.crate {
+  width: 48px;
+  height: 48px;
+  background:
+    linear-gradient(90deg, #8b5b3c 0 12px, #c88b5f 12px 36px, #8b5b3c 36px 100%);
+  border: 3px solid rgba(32, 40, 28, 0.92);
+}
+
+.forest-obstacle.spike {
+  width: 54px;
+  height: 24px;
+  background:
+    linear-gradient(135deg, transparent 0 28%, #eff4fb 28% 72%, transparent 72%) 0 0 / 18px 100% repeat-x;
+  border-bottom: 3px solid rgba(32, 40, 28, 0.92);
+}
+
+.forest-obstacle.spring {
+  width: 46px;
+  height: 24px;
+  background: linear-gradient(180deg, #7fd9ff, #4a79ff);
+  border: 3px solid rgba(32, 40, 28, 0.92);
+}
+
+.forest-obstacle.spring::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -15px;
+  height: 15px;
+  background: #fff8a8;
+  border: 3px solid rgba(32, 40, 28, 0.92);
+}
+
+.finish-tree {
+  width: 70px;
+  height: 110px;
+}
+
+.finish-tree::before {
+  content: "";
+  position: absolute;
+  left: 27px;
+  bottom: 0;
+  width: 16px;
+  height: 50px;
+  background: #775132;
+  border: 3px solid rgba(32, 40, 28, 0.92);
+}
+
+.finish-tree::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d9ffa9, #76cf71 70%);
+  border: 3px solid rgba(32, 40, 28, 0.92);
+}
+
+.finish-portal {
+  bottom: 92px;
+  width: 58px;
+  height: 74px;
+  border-radius: 50% 50% 46% 46%;
+  background: radial-gradient(circle at 50% 50%, #fff8c4 0 10%, #9ef0ff 26%, #4aa9ff 52%, #8559ff 78%, rgba(133,89,255,0.08) 100%);
+  border: 3px solid rgba(32, 40, 28, 0.92);
+  box-shadow: 0 0 28px rgba(132, 178, 255, 0.7);
+}
+
+.shared-map-header {
+  z-index: 2;
+  top: 16px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.shared-map-copy {
+  padding: 12px 14px;
+  max-width: 540px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 3px solid rgba(24, 34, 56, 0.9);
+  box-shadow: 6px 6px 0 rgba(22, 38, 58, 0.18);
+}
+
+.shared-map-copy strong {
+  display: block;
+  font-family: var(--ui-font);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.shared-map-copy span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.shared-map-rank {
+  padding: 10px 12px;
+  color: #fff;
+  background: rgba(24, 34, 56, 0.85);
+  border: 3px solid #fff;
+  font-family: var(--display-font);
+  font-size: 18px;
+}
+
+.shared-runner {
+  z-index: 3;
+}
+
+.shared-runner-status {
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #22304a;
+  border: 2px solid rgba(24, 34, 56, 0.86);
+  font-size: 10px;
+  font-family: var(--ui-font);
+  font-weight: 800;
+}
+
+.shared-runner-rank {
+  top: -56px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 7px;
+  color: #fff;
+  background: rgba(24, 34, 56, 0.86);
+  border: 2px solid #fff;
+  font-family: var(--display-font);
+  font-size: 14px;
+}
+
+.preview-runner .shared-runner-status,
+.preview-runner .shared-runner-rank {
+  display: none;
+}
+
 .countdown-overlay {
   position: absolute;
   inset: 58px 12px 12px;
@@ -597,6 +943,18 @@ button {
   background-size: 24px 100%;
 }
 
+.sparkle-strip {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 26%, rgba(255, 244, 129, 0.95) 0 2px, transparent 2px),
+    radial-gradient(circle at 37% 18%, rgba(255, 244, 129, 0.7) 0 2px, transparent 2px),
+    radial-gradient(circle at 61% 22%, rgba(255, 244, 129, 0.85) 0 2px, transparent 2px),
+    radial-gradient(circle at 82% 16%, rgba(255, 244, 129, 0.7) 0 2px, transparent 2px);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
 .zone {
   position: absolute;
   bottom: 40px;
@@ -639,6 +997,68 @@ button {
   height: 14px;
   border: 3px solid var(--pixel-border);
   background: #55b65b;
+}
+
+.pixel-crate,
+.pixel-spike,
+.pixel-spring {
+  position: absolute;
+  z-index: 1;
+  bottom: 40px;
+  transform: translateX(-50%);
+}
+
+.pixel-crate {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--pixel-border);
+  background:
+    linear-gradient(90deg, #8f5536 0 8px, #c37b4c 8px 32px, #8f5536 32px 100%);
+}
+
+.pixel-crate::before,
+.pixel-crate::after {
+  content: "";
+  position: absolute;
+  background: rgba(62, 30, 15, 0.42);
+}
+
+.pixel-crate::before {
+  inset: 16px 4px;
+}
+
+.pixel-crate::after {
+  top: 4px;
+  bottom: 4px;
+  left: 16px;
+  width: 4px;
+}
+
+.pixel-spike {
+  width: 46px;
+  height: 30px;
+  background:
+    linear-gradient(135deg, transparent 0 30%, #dadde5 30% 70%, transparent 70%) 0 0 / 15px 100% repeat-x;
+  border-bottom: 3px solid var(--pixel-border);
+}
+
+.pixel-spring {
+  width: 40px;
+  height: 24px;
+  border: 3px solid var(--pixel-border);
+  background:
+    linear-gradient(180deg, #8bd7ff 0 7px, #ef5449 7px 14px, #8bd7ff 14px 100%);
+}
+
+.pixel-spring::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: -14px;
+  height: 14px;
+  border: 3px solid var(--pixel-border);
+  background: #fff0a1;
 }
 
 .finish-castle {
@@ -699,13 +1119,18 @@ button {
   z-index: 2;
   width: 70px;
   transform: translateX(-50%);
-  transition: left 140ms linear, bottom 140ms ease-out;
+  transition: left 140ms linear, bottom 180ms ease-out, transform 140ms linear;
   display: grid;
   justify-items: center;
 }
 
 .runner.is-boosting {
   bottom: 56px;
+}
+
+.runner.is-jumping {
+  bottom: 86px;
+  transform: translateX(-50%) rotate(-6deg);
 }
 
 .runner.is-trapped {
@@ -838,6 +1263,12 @@ button {
   width: 100%;
 }
 
+.controller-buttons {
+  display: grid;
+  grid-template-columns: 1.25fr 0.95fr;
+  gap: 12px;
+}
+
 .player-lane-card {
   margin: 18px 0;
   padding: 14px;
@@ -858,6 +1289,22 @@ button {
     linear-gradient(180deg, #ffd359 0 14%, #f48a42 14% 80%, #d54b38 80% 100%);
   box-shadow: 0 10px 0 #7d2a1d;
   touch-action: manipulation;
+}
+
+.run-button {
+  background:
+    linear-gradient(180deg, #ffd359 0 14%, #f48a42 14% 80%, #d54b38 80% 100%);
+}
+
+.jump-button {
+  background:
+    linear-gradient(180deg, #8bd7ff 0 14%, #4aa9ff 14% 80%, #2356c9 80% 100%);
+  box-shadow: 0 10px 0 #16347e;
+}
+
+.jump-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 6px 0 #16347e;
 }
 
 .boost-button:active {
@@ -913,5 +1360,9 @@ button {
 
   .countdown-label {
     font-size: 18px;
+  }
+
+  .controller-buttons {
+    grid-template-columns: 1fr;
   }
 }
