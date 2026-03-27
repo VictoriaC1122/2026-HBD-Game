@@ -685,13 +685,11 @@ function renderBattleArena(players) {
 
       return `
         <div class="${fighterClass}" style="left:${player.x}%; bottom:${playerBottom(index)}px">
+          <div class="fighter-name">${escapeHtml(crowdedMode ? player.name.slice(0, 8) : player.name)}</div>
           <div class="fighter-hp-bar">
             <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
           </div>
-          <div class="fighter-meta">
-            <span>${escapeHtml(crowdedMode ? player.name.slice(0, 8) : player.name)}</span>
-            <strong>${Math.max(0, player.hp)}${crowdedMode ? "" : " HP"}</strong>
-          </div>
+          <div class="fighter-meta">${Math.max(0, player.hp)}${crowdedMode ? "" : " HP"}</div>
           <div class="runner-avatar">${avatarSvg(avatar)}</div>
           <div class="fighter-status">${combatStatusText(player)}</div>
           ${(player.attackingUntil || 0) > Date.now() && !player.dead && !crowdedMode ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
@@ -752,13 +750,11 @@ function renderPlayerPreview(player = appState.localPlayer) {
     <div class="battle-map preview-map">
       ${arenaDecorations()}
       <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:74px">
+        <div class="fighter-name">${escapeHtml(player.name)}</div>
         <div class="fighter-hp-bar">
           <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
         </div>
-        <div class="fighter-meta">
-          <span>${escapeHtml(player.name)}</span>
-          <strong>${Math.max(0, player.hp)} HP</strong>
-        </div>
+        <div class="fighter-meta">${Math.max(0, player.hp)} HP</div>
         <div class="runner-avatar">${avatarSvg(avatar)}</div>
         <div class="fighter-status">${combatStatusText(player)}</div>
       </div>
