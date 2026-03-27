@@ -1,13 +1,13 @@
 const MAX_HP = 100;
-const MOVE_STEP = 3.2;
+const MOVE_STEP = 2.1;
 const ATTACK_RANGE = 11;
 const ATTACK_DAMAGE_MIN = 15;
 const ATTACK_DAMAGE_MAX = 28;
-const ATTACK_COOLDOWN = 760;
-const MOVE_COOLDOWN = 80;
-const JUMP_COOLDOWN = 760;
-const JUMP_AIR_TIME = 780;
-const HIT_STUN = 420;
+const ATTACK_COOLDOWN = 620;
+const MOVE_COOLDOWN = 55;
+const JUMP_COOLDOWN = 680;
+const JUMP_AIR_TIME = 700;
+const HIT_STUN = 360;
 const COUNTDOWN_STEPS = ["3", "2", "1", "FIGHT!"];
 
 const avatarDefinitions = [
@@ -47,7 +47,10 @@ const appState = {
   lastLocalMoveAt: 0,
   lastLocalJumpAt: 0,
   lastLocalAttackAt: 0,
-  damageBursts: []
+  damageBursts: [],
+  activeMoveDirection: null,
+  localMoveTimer: null,
+  renderLoopStarted: false
 };
 
 const el = {
@@ -316,6 +319,44 @@ function addDamageBurst(x, amount, crit = false) {
 function pruneDamageBursts() {
   const now = Date.now();
   appState.damageBursts = appState.damageBursts.filter((burst) => now - burst.createdAt < 820);
+}
+
+function hasLiveEffects() {
+  const now = Date.now();
+  if (appState.damageBursts.length) return true;
+  for (const player of appState.players.values()) {
+    if ((player.airborneUntil || 0) > now) return true;
+    if ((player.attackingUntil || 0) > now) return true;
+    if ((player.hitUntil || 0) > now) return true;
+  }
+  if (appState.localPlayer) {
+    if ((appState.localPlayer.airborneUntil || 0) > now) return true;
+    if ((appState.localPlayer.attackingUntil || 0) > now) return true;
+    if ((appState.localPlayer.hitUntil || 0) > now) return true;
+  }
+  return false;
+}
+
+function startRenderLoop() {
+  if (appState.renderLoopStarted) return;
+  appState.renderLoopStarted = true;
+
+  const tick = () => {
+    pruneDamageBursts();
+
+    if (appState.mode === "host") {
+      renderBattleArena([...appState.players.values()]);
+    }
+
+    if (appState.mode === "player" && appState.localPlayer) {
+      renderPlayerPreview(appState.localPlayer);
+      updatePlayerStatus();
+    }
+
+    window.requestAnimationFrame(tick);
+  };
+
+  window.requestAnimationFrame(tick);
 }
 
 function renderCountdownOverlay() {
@@ -706,6 +747,43 @@ function updatePlayerStatus() {
   }
 }
 
+function optimisticMove(direction) {
+  if (!appState.localPlayer || appState.localPlayer.dead) return;
+  appState.localPlayer.direction = direction;
+  appState.localPlayer.x = clampX(appState.localPlayer.x + (direction === "left" ? -MOVE_STEP : MOVE_STEP));
+  renderPlayerPreview(appState.localPlayer);
+}
+
+function optimisticJump() {
+  if (!appState.localPlayer || appState.localPlayer.dead) return;
+  appState.localPlayer.airborneUntil = Date.now() + JUMP_AIR_TIME;
+  renderPlayerPreview(appState.localPlayer);
+}
+
+function optimisticAttack() {
+  if (!appState.localPlayer || appState.localPlayer.dead) return;
+  appState.localPlayer.attackingUntil = Date.now() + 220;
+  renderPlayerPreview(appState.localPlayer);
+}
+
+function stopMoveHold() {
+  appState.activeMoveDirection = null;
+  if (appState.localMoveTimer) {
+    window.clearInterval(appState.localMoveTimer);
+    appState.localMoveTimer = null;
+  }
+}
+
+function startMoveHold(direction, sendMove) {
+  appState.activeMoveDirection = direction;
+  sendMove(direction);
+  stopMoveHold();
+  appState.activeMoveDirection = direction;
+  appState.localMoveTimer = window.setInterval(() => {
+    sendMove(direction);
+  }, MOVE_COOLDOWN);
+}
+
 function applyRemoteState(message) {
   appState.winnerId = message.winnerId;
   appState.gamePhase = message.gamePhase || "lobby";
@@ -907,6 +985,7 @@ function wireEvents() {
     const now = Date.now();
     if (now - appState.lastLocalMoveAt < MOVE_COOLDOWN) return;
     appState.lastLocalMoveAt = now;
+    optimisticMove(direction);
     appState.hostConnection.send({ type: "move", playerId: appState.playerId, direction });
     playTone(direction === "left" ? 260 : 280, 0.03, "square", 0.03);
   };
@@ -916,6 +995,7 @@ function wireEvents() {
     const now = Date.now();
     if (now - appState.lastLocalJumpAt < JUMP_COOLDOWN) return;
     appState.lastLocalJumpAt = now;
+    optimisticJump();
     appState.hostConnection.send({ type: "jump", playerId: appState.playerId });
     playTone(720, 0.05, "square", 0.04);
   };
@@ -925,19 +1005,23 @@ function wireEvents() {
     const now = Date.now();
     if (now - appState.lastLocalAttackAt < ATTACK_COOLDOWN) return;
     appState.lastLocalAttackAt = now;
+    optimisticAttack();
     appState.hostConnection.send({ type: "attack", playerId: appState.playerId });
     playTone(340, 0.07, "sawtooth", 0.05);
   };
 
-  el.leftButton.addEventListener("pointerdown", () => sendMove("left"));
-  el.rightButton.addEventListener("pointerdown", () => sendMove("right"));
+  el.leftButton.addEventListener("pointerdown", () => startMoveHold("left", sendMove));
+  el.rightButton.addEventListener("pointerdown", () => startMoveHold("right", sendMove));
   el.jumpButton.addEventListener("pointerdown", sendJump);
   el.attackButton.addEventListener("pointerdown", sendAttack);
+  window.addEventListener("pointerup", stopMoveHold);
+  window.addEventListener("pointercancel", stopMoveHold);
 }
 
 function init() {
   wireEvents();
   renderCountdownOverlay();
+  startRenderLoop();
 
   const params = new URLSearchParams(window.location.search);
   const join = params.get("join");
