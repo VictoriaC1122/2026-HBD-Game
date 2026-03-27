@@ -104,7 +104,7 @@ button {
 .app-shell {
   position: relative;
   z-index: 1;
-  width: min(1320px, calc(100% - 24px));
+  width: min(1560px, calc(100% - 24px));
   margin: 0 auto;
   padding: 20px 0 48px;
 }
@@ -256,7 +256,7 @@ button {
 }
 
 .host-grid {
-  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.55fr);
 }
 
 .card {
@@ -446,7 +446,7 @@ button {
 
 .race-stage {
   position: relative;
-  padding: 12px;
+  padding: 16px;
   background: #1f2638;
   border: 4px solid var(--pixel-border);
   box-shadow: inset 0 0 0 4px #5d667d;
@@ -503,14 +503,14 @@ button {
 
 .battle-map {
   position: relative;
-  min-height: 420px;
+  min-height: 560px;
   overflow: hidden;
   border: 4px solid var(--pixel-border);
   background: linear-gradient(180deg, #bff2ff 0%, #9ae5ff 26%, #d4ffd6 60%, #7ecf74 60%, #47673f 100%);
 }
 
 .preview-map {
-  min-height: 220px;
+  min-height: 260px;
 }
 
 .battle-backdrop,
@@ -687,6 +687,10 @@ button {
   will-change: left, bottom, transform, filter;
 }
 
+.battle-fighter.is-compact {
+  width: 68px;
+}
+
 .battle-fighter.face-left {
   transform: translateX(-50%) scaleX(-1);
 }
@@ -719,6 +723,12 @@ button {
   animation: idle-bob 1.35s ease-in-out infinite;
 }
 
+.battle-fighter.is-compact .runner-avatar {
+  width: 44px;
+  height: 44px;
+  border-width: 2px;
+}
+
 .fighter-hp-bar {
   width: 88px;
   height: 12px;
@@ -726,6 +736,12 @@ button {
   border: 2px solid var(--pixel-border);
   background: rgba(255,255,255,0.82);
   overflow: hidden;
+}
+
+.battle-fighter.is-compact .fighter-hp-bar {
+  width: 64px;
+  height: 9px;
+  margin-bottom: 4px;
 }
 
 .fighter-hp-fill {
@@ -741,6 +757,11 @@ button {
   text-align: center;
 }
 
+.battle-fighter.is-compact .fighter-meta {
+  top: -30px;
+  width: 72px;
+}
+
 .fighter-meta span,
 .fighter-meta strong {
   display: block;
@@ -749,6 +770,11 @@ button {
   font-weight: 900;
   color: #fff;
   text-shadow: 0 2px 0 rgba(17, 17, 17, 0.5);
+}
+
+.battle-fighter.is-compact .fighter-meta span,
+.battle-fighter.is-compact .fighter-meta strong {
+  font-size: 9px;
 }
 
 .fighter-status {
@@ -762,6 +788,12 @@ button {
   font-family: var(--ui-font);
   font-size: 10px;
   font-weight: 900;
+}
+
+.battle-fighter.is-compact .fighter-status {
+  bottom: -18px;
+  padding: 3px 6px;
+  font-size: 8px;
 }
 
 .attack-arc {
@@ -911,7 +943,7 @@ button {
 }
 
 .player-card {
-  max-width: 760px;
+  max-width: 920px;
   margin: 0 auto;
 }
 
@@ -1011,7 +1043,7 @@ button {
 }
 
 .player-lane-preview {
-  min-height: 220px;
+  min-height: 260px;
 }
 
 .battle-controls-grid {
@@ -1022,7 +1054,7 @@ button {
 
 .boost-button {
   width: 100%;
-  min-height: 118px;
+  min-height: 128px;
   color: #fff;
   font-size: clamp(28px, 8vw, 52px);
   letter-spacing: 0.08em;
@@ -1067,11 +1099,19 @@ button {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .battle-map {
+    min-height: 480px;
+  }
+
+  .player-card {
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 720px) {
   .app-shell {
-    width: min(100% - 12px, 1320px);
+    width: min(100% - 12px, 1560px);
     padding-top: 12px;
   }
 
@@ -1080,11 +1120,82 @@ button {
     padding: 16px;
   }
 
+  .room-layout {
+    gap: 14px;
+  }
+
+  .player-status-bar,
+  .controller-caption {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .player-status-chip,
+  .player-action-chip {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .player-lane-card {
+    padding: 12px;
+  }
+
+  .player-lane-preview,
+  .preview-map {
+    min-height: 230px;
+  }
+
   .battle-controls-grid {
     grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 
   .boost-button {
-    min-height: 102px;
+    min-height: 112px;
+    font-size: clamp(26px, 10vw, 42px);
+  }
+
+  .battle-map {
+    min-height: 360px;
+  }
+
+  .battle-map-copy {
+    max-width: 100%;
+    padding: 10px 12px;
+  }
+
+  .battle-map-copy strong {
+    font-size: 16px;
+  }
+
+  .battle-map-copy span {
+    font-size: 12px;
+  }
+
+  .battle-chip {
+    font-size: 16px;
+  }
+
+  .battle-fighter {
+    width: 72px;
+  }
+
+  .battle-fighter .runner-avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .fighter-hp-bar {
+    width: 68px;
+  }
+
+  .fighter-meta {
+    width: 84px;
+  }
+
+  .fighter-meta span,
+  .fighter-meta strong,
+  .fighter-status {
+    font-size: 9px;
   }
 }

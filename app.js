@@ -50,7 +50,9 @@ const appState = {
   damageBursts: [],
   activeMoveDirection: null,
   localMoveTimer: null,
-  renderLoopStarted: false
+  renderLoopStarted: false,
+  needsRender: true,
+  lastRenderAt: 0
 };
 
 const el = {
@@ -314,6 +316,10 @@ function addDamageBurst(x, amount, crit = false) {
     crit,
     createdAt: Date.now()
   });
+  if (appState.damageBursts.length > 10) {
+    appState.damageBursts = appState.damageBursts.slice(-10);
+  }
+  appState.needsRender = true;
 }
 
 function pruneDamageBursts() {
@@ -342,13 +348,17 @@ function startRenderLoop() {
   appState.renderLoopStarted = true;
 
   const tick = () => {
+    const now = Date.now();
     pruneDamageBursts();
+    const shouldRender = appState.needsRender || hasLiveEffects();
 
-    if (appState.mode === "host") {
+    if (shouldRender && now - appState.lastRenderAt >= 33 && appState.mode === "host") {
+      appState.lastRenderAt = now;
       renderBattleArena([...appState.players.values()]);
     }
 
-    if (appState.mode === "player" && appState.localPlayer) {
+    if (shouldRender && now - appState.lastRenderAt >= 33 && appState.mode === "player" && appState.localPlayer) {
+      appState.lastRenderAt = now;
       renderPlayerPreview(appState.localPlayer);
       updatePlayerStatus();
     }
@@ -389,10 +399,12 @@ function renderPodium(players) {
 }
 
 function renderBattleArena(players) {
+  appState.needsRender = false;
   const sorted = [...players].sort((a, b) => {
     if (Number(isAlive(b)) !== Number(isAlive(a))) return Number(isAlive(b)) - Number(isAlive(a));
     return b.hp - a.hp;
   });
+  const crowdedMode = sorted.length >= 18;
 
   el.playerCount.textContent = String(sorted.length);
   el.hudPlayers.textContent = String(sorted.length);
@@ -435,6 +447,7 @@ function renderBattleArena(players) {
       const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
       const fighterClass = [
         "battle-fighter",
+        crowdedMode ? "is-compact" : "",
         player.dead ? "is-dead" : "",
         isAirborne(player) ? "is-jumping" : "",
         (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
@@ -450,12 +463,12 @@ function renderBattleArena(players) {
             <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
           </div>
           <div class="fighter-meta">
-            <span>${escapeHtml(player.name)}</span>
-            <strong>${Math.max(0, player.hp)} HP</strong>
+            <span>${escapeHtml(crowdedMode ? player.name.slice(0, 8) : player.name)}</span>
+            <strong>${Math.max(0, player.hp)}${crowdedMode ? "" : " HP"}</strong>
           </div>
           <div class="runner-avatar">${avatarSvg(avatar)}</div>
           <div class="fighter-status">${combatStatusText(player)}</div>
-          ${(player.attackingUntil || 0) > Date.now() && !player.dead ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
+          ${(player.attackingUntil || 0) > Date.now() && !player.dead && !crowdedMode ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
         </div>
       `;
     })
@@ -467,7 +480,7 @@ function renderBattleArena(players) {
       <div class="battle-map-header">
         <div class="battle-map-copy">
           <strong>生日亂鬥競技場</strong>
-          <span>移動、跳躍、揮擊，把其他人打到血條歸零。最後活著的人獲勝。</span>
+          <span>${crowdedMode ? "40 人同場優化模式啟動中，介面會自動精簡，讓大場面也保持順暢。" : "移動、跳躍、揮擊，把其他人打到血條歸零。最後活著的人獲勝。"}</span>
         </div>
         <div class="battle-chip">${alivePlayers.length} ALIVE</div>
       </div>
@@ -494,6 +507,7 @@ function renderBattleArena(players) {
 
 function renderPlayerPreview(player = appState.localPlayer) {
   if (!player) return;
+  appState.needsRender = false;
   const avatar = getAvatarById(player.avatarId);
   const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
   const fighterClass = [
@@ -535,6 +549,7 @@ function sendToAll(message) {
 
 function broadcastState() {
   pruneDamageBursts();
+  appState.needsRender = true;
   const payload = {
     type: "state",
     winnerId: appState.winnerId,
@@ -543,7 +558,6 @@ function broadcastState() {
     players: [...appState.players.values()]
   };
   sendToAll(payload);
-  renderBattleArena([...appState.players.values()]);
 }
 
 function createPlayer(messagePlayer) {
@@ -751,19 +765,19 @@ function optimisticMove(direction) {
   if (!appState.localPlayer || appState.localPlayer.dead) return;
   appState.localPlayer.direction = direction;
   appState.localPlayer.x = clampX(appState.localPlayer.x + (direction === "left" ? -MOVE_STEP : MOVE_STEP));
-  renderPlayerPreview(appState.localPlayer);
+  appState.needsRender = true;
 }
 
 function optimisticJump() {
   if (!appState.localPlayer || appState.localPlayer.dead) return;
   appState.localPlayer.airborneUntil = Date.now() + JUMP_AIR_TIME;
-  renderPlayerPreview(appState.localPlayer);
+  appState.needsRender = true;
 }
 
 function optimisticAttack() {
   if (!appState.localPlayer || appState.localPlayer.dead) return;
   appState.localPlayer.attackingUntil = Date.now() + 220;
-  renderPlayerPreview(appState.localPlayer);
+  appState.needsRender = true;
 }
 
 function stopMoveHold() {
@@ -792,7 +806,7 @@ function applyRemoteState(message) {
   const latest = message.players.find((player) => player.id === appState.playerId);
   if (latest) {
     appState.localPlayer = latest;
-    renderPlayerPreview(latest);
+    appState.needsRender = true;
   }
   renderCountdownOverlay();
   updatePlayerStatus();
