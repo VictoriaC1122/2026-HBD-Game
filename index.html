@@ -3,40 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Birthday Dash</title>
+    <title>Birthday Dash Deluxe</title>
     <meta
       name="description"
-      content="掃 QR Code 加入的多人生日競速遊戲，選頭像、用手機衝刺，看看誰先抵達終點。"
+      content="像素風多人生日派對競速遊戲，掃 QR Code 用手機加入，在大螢幕上比賽誰先衝過終點。"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="sky">
-      <div class="sun"></div>
-      <div class="cloud cloud-a"></div>
-      <div class="cloud cloud-b"></div>
-      <div class="cloud cloud-c"></div>
+    <div class="pixel-sky">
+      <div class="pixel-cloud cloud-a"></div>
+      <div class="pixel-cloud cloud-b"></div>
+      <div class="pixel-cloud cloud-c"></div>
+      <div class="pixel-mountain mountain-a"></div>
+      <div class="pixel-mountain mountain-b"></div>
     </div>
 
     <main class="app-shell">
       <section class="hero-card">
         <div class="hero-copy">
-          <p class="eyebrow">Birthday Party Multiplayer Game</p>
-          <h1>Birthday Dash</h1>
+          <p class="eyebrow">Pixel Party Race</p>
+          <h1>Birthday Dash Deluxe</h1>
           <p class="hero-text">
-            掃描 QR Code 用手機加入房間，選一個喜歡的頭像，狂按衝刺鍵跳躍前進，看看誰最先衝過終點旗。
+            像你照片裡那種復古電玩競速感，但做成原創像素派對版本。大家掃碼加入後，用手機狂按衝刺鍵，在大螢幕像素地圖上比誰先跑到終點城堡。
           </p>
         </div>
         <div class="hero-pill-row">
-          <span class="hero-pill">多人即時連線</span>
-          <span class="hero-pill">手機直接加入</span>
-          <span class="hero-pill">適合投影大螢幕</span>
+          <span class="hero-pill">橫向卷軸視覺</span>
+          <span class="hero-pill">3 2 1 倒數音效</span>
+          <span class="hero-pill">多人手機加入</span>
         </div>
       </section>
 
@@ -48,15 +49,13 @@
             <div class="card-header">
               <div>
                 <p class="section-label">房間資訊</p>
-                <h2>讓大家掃碼加入</h2>
+                <h2>掃碼加入 Birthday Dash</h2>
               </div>
               <button id="copyLinkButton" class="secondary-button">複製加入連結</button>
             </div>
 
             <div class="room-layout">
-              <div>
-                <div id="qrCode" class="qr-box" aria-label="加入房間 QR Code"></div>
-              </div>
+              <div id="qrCode" class="qr-box" aria-label="加入房間 QR Code"></div>
               <div class="room-meta">
                 <div class="stat-block">
                   <span class="stat-label">房間代碼</span>
@@ -71,7 +70,7 @@
                   <strong id="playerCount">0</strong>
                 </div>
                 <p class="hint-text">
-                  建議把這個畫面投到電視或投影幕，玩家用自己的手機掃碼後就能一起玩。
+                  建議把主機畫面投到電視。玩家掃碼後會在手機上選頭像，再用手機按鈕衝刺。
                 </p>
               </div>
             </div>
@@ -81,7 +80,7 @@
             <div class="card-header">
               <div>
                 <p class="section-label">比賽控制</p>
-                <h2>開始生日衝刺</h2>
+                <h2>開跑與重開一局</h2>
               </div>
             </div>
 
@@ -90,7 +89,7 @@
               <button id="resetRaceButton" class="secondary-button">重設本局</button>
             </div>
             <p class="hint-text">
-              規則：玩家在手機上瘋狂點擊衝刺鍵，每次會向前跳躍；踩到星星加速格會大幅前進，踩到黏黏泥巴會暫時減速。
+              開始後會先倒數 3、2、1，再正式開跑。踩到星星磚塊會爆衝，踩到泥巴洞會被拖慢。
             </p>
           </div>
         </div>
@@ -98,19 +97,42 @@
         <div class="card race-card">
           <div class="card-header">
             <div>
-              <p class="section-label">比賽畫面</p>
-              <h2>誰先碰到終點旗？</h2>
+              <p class="section-label">主舞台</p>
+              <h2>像素大螢幕競速</h2>
             </div>
             <div id="raceSummary" class="race-summary">等待玩家加入...</div>
           </div>
 
           <div class="track-legend">
-            <span><i class="legend-boost"></i> 星星衝刺格</span>
-            <span><i class="legend-trap"></i> 泥巴減速格</span>
-            <span><i class="legend-finish"></i> 終點旗</span>
+            <span><i class="legend-boost"></i> 星星磚</span>
+            <span><i class="legend-trap"></i> 泥巴洞</span>
+            <span><i class="legend-finish"></i> 終點城堡</span>
           </div>
 
-          <div id="track" class="track"></div>
+          <div class="race-stage">
+            <div class="stage-hud">
+              <div class="hud-chip">
+                <span class="hud-label">PLAYERS</span>
+                <strong id="hudPlayers">0</strong>
+              </div>
+              <div class="hud-chip">
+                <span class="hud-label">MODE</span>
+                <strong id="hudMode">LOBBY</strong>
+              </div>
+              <div class="hud-chip">
+                <span class="hud-label">GOAL</span>
+                <strong>CASTLE</strong>
+              </div>
+            </div>
+
+            <div id="countdownOverlay" class="countdown-overlay hidden">
+              <div id="countdownNumber" class="countdown-number">3</div>
+              <div id="countdownLabel" class="countdown-label">READY</div>
+            </div>
+
+            <div id="track" class="track"></div>
+          </div>
+
           <div id="podium" class="podium"></div>
         </div>
       </section>
@@ -119,13 +141,13 @@
         <div class="card player-card">
           <div id="joinPanel">
             <p class="section-label">手機加入</p>
-            <h2>選頭像，準備衝刺</h2>
+            <h2>選角色，準備衝刺</h2>
             <label class="input-label" for="playerName">你的名字</label>
             <input id="playerName" class="text-input" type="text" maxlength="16" placeholder="例如：小婷" />
 
             <div>
               <div class="avatar-header">
-                <span class="input-label">挑一個喜歡的頭像</span>
+                <span class="input-label">選一個像素角色</span>
                 <span id="selectedAvatarName" class="avatar-name"></span>
               </div>
               <div id="avatarPicker" class="avatar-picker"></div>
@@ -140,9 +162,9 @@
             <div class="player-lane-card">
               <div id="playerLanePreview" class="player-lane-preview"></div>
             </div>
-            <button id="boostButton" class="boost-button" disabled>點我衝刺</button>
+            <button id="boostButton" class="boost-button" disabled>RUN</button>
             <p id="controllerHint" class="hint-text">
-              等待房主開始比賽，開始後狂按按鈕，讓角色一路跳到終點。
+              等待房主開始比賽，倒數結束後狂按按鈕衝向終點。
             </p>
           </div>
         </div>

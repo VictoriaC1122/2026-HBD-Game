@@ -1,26 +1,30 @@
 const FINISH_DISTANCE = 100;
-const BOOST_STEP = 6;
+const BOOST_STEP = 7;
 const BASE_STEP = 3;
-const HOP_COOLDOWN = 140;
+const HOP_COOLDOWN = 125;
+const COUNTDOWN_STEPS = ["3", "2", "1", "GO!"];
+const laneThemes = ["sky", "sunset", "night", "cave"];
 
 const avatarDefinitions = [
-  { id: "sunny", name: "Sunny Fox", colors: ["#ff9668", "#ffd368", "#7f4c2d"], icon: "fox" },
+  { id: "rose", name: "Rose Hero", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
   { id: "mint", name: "Mint Bunny", colors: ["#8de5c1", "#d3fff1", "#2a6d5a"], icon: "bunny" },
-  { id: "berry", name: "Berry Cat", colors: ["#ff88a7", "#ffd6e1", "#77324d"], icon: "cat" },
-  { id: "sky", name: "Sky Bear", colors: ["#7ebcff", "#dcefff", "#2b4670"], icon: "bear" },
-  { id: "peach", name: "Peach Hero", colors: ["#ffc38c", "#fff0d8", "#7d5136"], icon: "hero" },
-  { id: "lime", name: "Lime Dino", colors: ["#a4e96d", "#ebffd8", "#3b6f1d"], icon: "dino" },
-  { id: "violet", name: "Violet Star", colors: ["#be97ff", "#f1e4ff", "#52388c"], icon: "star" },
+  { id: "pixel", name: "Pixel Fox", colors: ["#ff9b54", "#ffe1bf", "#723b17"], icon: "fox" },
+  { id: "nova", name: "Nova Cat", colors: ["#8bb6ff", "#e2edff", "#304884"], icon: "cat" },
+  { id: "mango", name: "Mango Dino", colors: ["#ffd166", "#fff1bf", "#8c5b13"], icon: "dino" },
+  { id: "aqua", name: "Aqua Whale", colors: ["#72ddf7", "#def8ff", "#23667a"], icon: "whale" },
   { id: "cocoa", name: "Cocoa Pup", colors: ["#bc8d62", "#f2dec6", "#5a3d28"], icon: "pup" },
-  { id: "coral", name: "Coral Chick", colors: ["#ff7d74", "#ffe1cb", "#7c342f"], icon: "chick" },
-  { id: "ocean", name: "Ocean Whale", colors: ["#6cd8ff", "#def7ff", "#1d5d78"], icon: "whale" }
+  { id: "violet", name: "Violet Mage", colors: ["#be97ff", "#f1e4ff", "#52388c"], icon: "mage" },
+  { id: "pearl", name: "Pearl Chick", colors: ["#ff8d72", "#ffe4cc", "#7a3d25"], icon: "chick" },
+  { id: "leaf", name: "Leaf Bear", colors: ["#9ed36a", "#eefbd9", "#3b6f1d"], icon: "bear" },
+  { id: "ember", name: "Ember Star", colors: ["#ff7b5a", "#ffe1d8", "#833226"], icon: "star" },
+  { id: "glow", name: "Glow Robot", colors: ["#85f4ff", "#e2fdff", "#305764"], icon: "robot" }
 ];
 
 const laneZones = [
-  { position: 24, type: "boost", icon: "⭐" },
-  { position: 42, type: "trap", icon: "🟤" },
-  { position: 61, type: "boost", icon: "⭐" },
-  { position: 79, type: "trap", icon: "🟤" }
+  { position: 23, type: "boost", icon: "★" },
+  { position: 39, type: "trap", icon: "!" },
+  { position: 56, type: "boost", icon: "★" },
+  { position: 74, type: "trap", icon: "!" }
 ];
 
 const appState = {
@@ -37,7 +41,11 @@ const appState = {
   localPlayerSnapshot: [],
   raceStarted: false,
   winnerId: null,
-  joinUrl: ""
+  joinUrl: "",
+  gamePhase: "lobby",
+  countdownValue: "",
+  countdownTimer: null,
+  audioContext: null
 };
 
 const el = {
@@ -48,9 +56,14 @@ const el = {
   roomCode: document.querySelector("#roomCode"),
   joinUrl: document.querySelector("#joinUrl"),
   playerCount: document.querySelector("#playerCount"),
+  hudPlayers: document.querySelector("#hudPlayers"),
+  hudMode: document.querySelector("#hudMode"),
   track: document.querySelector("#track"),
   podium: document.querySelector("#podium"),
   raceSummary: document.querySelector("#raceSummary"),
+  countdownOverlay: document.querySelector("#countdownOverlay"),
+  countdownNumber: document.querySelector("#countdownNumber"),
+  countdownLabel: document.querySelector("#countdownLabel"),
   copyLinkButton: document.querySelector("#copyLinkButton"),
   startRaceButton: document.querySelector("#startRaceButton"),
   resetRaceButton: document.querySelector("#resetRaceButton"),
@@ -68,16 +81,18 @@ const el = {
 
 function iconMarkup(icon, accent) {
   const paths = {
-    fox: `<path d="M14 24L22 8l10 9 10-9 8 16-5 5v15H19V29z" fill="${accent}" opacity=".22"/><circle cx="24" cy="28" r="11" fill="${accent}"/><circle cx="40" cy="28" r="11" fill="${accent}"/><circle cx="32" cy="34" r="16" fill="#fff4df"/><circle cx="26" cy="34" r="3" fill="#2d2d2d"/><circle cx="38" cy="34" r="3" fill="#2d2d2d"/><path d="M29 42c2 2 4 2 6 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    bunny: `<ellipse cx="24" cy="18" rx="8" ry="14" fill="${accent}"/><ellipse cx="40" cy="18" rx="8" ry="14" fill="${accent}"/><circle cx="32" cy="36" r="18" fill="#fffaf2"/><circle cx="25" cy="35" r="3" fill="#2d2d2d"/><circle cx="39" cy="35" r="3" fill="#2d2d2d"/><path d="M31 38h2v6h-2z" fill="${accent}"/><path d="M28 43c3 2 5 2 8 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    cat: `<path d="M20 20l8-10 4 8 4-8 8 10v10H20z" fill="${accent}"/><circle cx="32" cy="37" r="18" fill="#fff4fb"/><circle cx="25" cy="36" r="3" fill="#2d2d2d"/><circle cx="39" cy="36" r="3" fill="#2d2d2d"/><path d="M32 38l-3 4h6z" fill="${accent}"/><path d="M24 43c5 2 11 2 16 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    bear: `<circle cx="21" cy="23" r="8" fill="${accent}"/><circle cx="43" cy="23" r="8" fill="${accent}"/><circle cx="32" cy="36" r="18" fill="#fffefc"/><circle cx="25" cy="35" r="3" fill="#2d2d2d"/><circle cx="39" cy="35" r="3" fill="#2d2d2d"/><ellipse cx="32" cy="41" rx="6" ry="4.5" fill="${accent}"/><path d="M29 42c2 1 4 1 6 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    hero: `<circle cx="32" cy="20" r="12" fill="${accent}"/><path d="M16 26h32l-4 24H20z" fill="${accent}" opacity=".28"/><circle cx="32" cy="32" r="16" fill="#fff7ef"/><circle cx="26" cy="31" r="3" fill="#2d2d2d"/><circle cx="38" cy="31" r="3" fill="#2d2d2d"/><path d="M28 39c3 3 5 3 8 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    dino: `<path d="M20 24c0-8 6-14 14-14h8l6 8-4 10v16H20z" fill="${accent}"/><circle cx="31" cy="34" r="16" fill="#f5ffed"/><circle cx="27" cy="33" r="3" fill="#2d2d2d"/><circle cx="38" cy="33" r="3" fill="#2d2d2d"/><path d="M28 40c2 2 6 2 8 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    star: `<path d="M32 10l6 13 14 2-10 10 3 14-13-7-13 7 3-14-10-10 14-2z" fill="${accent}"/><circle cx="26" cy="30" r="3" fill="#2d2d2d"/><circle cx="38" cy="30" r="3" fill="#2d2d2d"/><path d="M27 37c3 2 7 2 10 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    pup: `<path d="M18 18l10 6 8-6 10 6v10H18z" fill="${accent}"/><circle cx="32" cy="36" r="18" fill="#fff7f0"/><circle cx="25" cy="35" r="3" fill="#2d2d2d"/><circle cx="39" cy="35" r="3" fill="#2d2d2d"/><ellipse cx="32" cy="40" rx="5" ry="4" fill="${accent}"/><path d="M27 44c4 2 6 2 10 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    chick: `<circle cx="32" cy="33" r="18" fill="${accent}"/><path d="M18 24l8-8 6 7 6-7 8 8" fill="${accent}"/><circle cx="26" cy="31" r="3" fill="#2d2d2d"/><circle cx="38" cy="31" r="3" fill="#2d2d2d"/><path d="M32 37l-5 4h10z" fill="#ff9348"/><path d="M27 42c3 2 7 2 10 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`,
-    whale: `<path d="M14 34c0-10 8-18 18-18h12c6 0 12 5 12 11v16H32c-10 0-18-8-18-18z" fill="${accent}"/><circle cx="26" cy="31" r="3" fill="#2d2d2d"/><circle cx="38" cy="31" r="3" fill="#2d2d2d"/><path d="M28 39c3 2 5 2 8 0" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round"/>`
+    fox: `<path d="M10 24h8v8h-8zM18 16h8v8h-8zM38 16h8v8h-8zM46 24h8v8h-8zM18 24h28v24H18zM22 36h4v4h-4zM38 36h4v4h-4zM28 44h8v4h-8z" fill="${accent}"/><path d="M22 28h20v12H22z" fill="#fff4df"/>`,
+    bunny: `<path d="M20 6h8v18h-8zM36 6h8v18h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffaf2"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM30 42h4v4h-4z" fill="#2d2d2d"/>`,
+    cat: `<path d="M16 18h8v8h-8zM24 10h8v8h-8zM32 10h8v8h-8zM40 18h8v8h-8zM16 26h32v24H16z" fill="${accent}"/><path d="M20 30h24v16H20z" fill="#fff4fb"/><path d="M24 36h4v4h-4zM36 36h4v4h-4zM28 42h8v4h-8z" fill="#2d2d2d"/>`,
+    bear: `<path d="M14 18h8v8h-8zM42 18h8v8h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffefc"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM28 42h8v4h-8z" fill="#2d2d2d"/>`,
+    hero: `<path d="M22 8h20v10H22zM18 18h28v12H18zM16 30h12v18H16zM36 30h12v18H36zM28 30h8v18h-8z" fill="${accent}"/><path d="M22 18h20v14H22z" fill="#fff4de"/><path d="M26 22h4v4h-4zM34 22h4v4h-4zM28 28h8v4h-8z" fill="#2d2d2d"/>`,
+    dino: `<path d="M16 18h20v8H16zM36 22h12v20H36zM20 26h20v20H20zM16 38h8v10h-8z" fill="${accent}"/><path d="M24 26h12v16H24z" fill="#f5ffed"/><path d="M26 30h4v4h-4zM34 30h4v4h-4zM28 38h8v4h-8z" fill="#2d2d2d"/>`,
+    whale: `<path d="M12 22h36v20H12zM48 26h6v12h-6zM20 18h18v6H20z" fill="${accent}"/><path d="M20 26h20v12H20z" fill="#def8ff"/><path d="M24 30h4v4h-4zM36 30h4v4h-4zM28 36h8v4h-8z" fill="#2d2d2d"/>`,
+    pup: `<path d="M16 18h10v8H16zM38 18h10v8H38zM18 24h28v24H18z" fill="${accent}"/><path d="M22 28h20v18H22z" fill="#fff7f0"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM28 42h8v4h-8z" fill="#2d2d2d"/>`,
+    mage: `<path d="M20 8h24v8H20zM16 16h32v10H16zM20 26h24v22H20z" fill="${accent}"/><path d="M24 20h16v20H24z" fill="#fff8ff"/><path d="M26 28h4v4h-4zM34 28h4v4h-4zM28 36h8v4h-8z" fill="#2d2d2d"/>`,
+    chick: `<path d="M18 16h28v8H18zM16 24h32v22H16z" fill="${accent}"/><path d="M20 28h24v16H20z" fill="#ffe9cc"/><path d="M24 32h4v4h-4zM36 32h4v4h-4zM28 38h8v4h-8z" fill="#2d2d2d"/><path d="M28 40h8v4h-8z" fill="#ff9348"/>`,
+    star: `<path d="M28 10h8v8h8v8h8v8h-8v8h-8v8h-8v-8h-8v-8h-8v-8h8v-8h8z" fill="${accent}"/><path d="M24 28h4v4h-4zM36 28h4v4h-4zM26 36h12v4H26z" fill="#2d2d2d"/>`,
+    robot: `<path d="M20 10h24v6H20zM18 18h28v24H18zM14 24h4v10h-4zM46 24h4v10h-4zM22 42h8v8h-8zM34 42h8v8h-8z" fill="${accent}"/><path d="M22 22h20v16H22z" fill="#edfdfd"/><path d="M24 26h4v4h-4zM36 26h4v4h-4zM26 34h12v4H26z" fill="#2d2d2d"/>`
   };
 
   return paths[icon];
@@ -86,14 +101,14 @@ function iconMarkup(icon, accent) {
 function avatarSvg(avatar) {
   const [primary, secondary, accent] = avatar.colors;
   return `
-    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${avatar.name}">
+    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${avatar.name}" shape-rendering="crispEdges">
       <defs>
         <linearGradient id="bg-${avatar.id}" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="${primary}" />
           <stop offset="100%" stop-color="${secondary}" />
         </linearGradient>
       </defs>
-      <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#bg-${avatar.id})" />
+      <rect x="2" y="2" width="60" height="60" fill="url(#bg-${avatar.id})" />
       ${iconMarkup(avatar.icon, accent)}
     </svg>
   `;
@@ -103,15 +118,15 @@ function getAvatarById(id) {
   return avatarDefinitions.find((avatar) => avatar.id === id) || avatarDefinitions[0];
 }
 
-function formatRank(index) {
-  return ["1st", "2nd", "3rd"][index] || `${index + 1}th`;
-}
-
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => {
     const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
     return map[char];
   });
+}
+
+function formatRank(index) {
+  return ["1ST", "2ND", "3RD"][index] || `${index + 1}TH`;
 }
 
 function status(text) {
@@ -128,6 +143,53 @@ function randomRoomCode(peerId) {
   return peerId.slice(-6).toUpperCase();
 }
 
+function getAudioContext() {
+  if (!window.AudioContext && !window.webkitAudioContext) return null;
+  if (!appState.audioContext) {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    appState.audioContext = new Context();
+  }
+  if (appState.audioContext.state === "suspended") {
+    appState.audioContext.resume();
+  }
+  return appState.audioContext;
+}
+
+function playTone(frequency, duration, type = "square", volume = 0.05) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
+  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  oscillator.start();
+  oscillator.stop(ctx.currentTime + duration);
+}
+
+function playCountdownTone(step) {
+  if (step === "GO!") {
+    playTone(660, 0.18, "square", 0.08);
+    setTimeout(() => playTone(880, 0.18, "square", 0.08), 110);
+    return;
+  }
+  playTone(440, 0.14, "square", 0.06);
+}
+
+function playVictoryFanfare() {
+  playTone(523.25, 0.12, "square", 0.08);
+  setTimeout(() => playTone(659.25, 0.12, "square", 0.08), 130);
+  setTimeout(() => playTone(783.99, 0.18, "square", 0.08), 260);
+}
+
+function themeForIndex(index) {
+  return laneThemes[index % laneThemes.length];
+}
+
 function setupAvatarPicker() {
   el.avatarPicker.innerHTML = avatarDefinitions
     .map((avatar) => {
@@ -141,8 +203,7 @@ function setupAvatarPicker() {
     })
     .join("");
 
-  const selectedAvatar = getAvatarById(appState.selectedAvatarId);
-  el.selectedAvatarName.textContent = selectedAvatar.name;
+  el.selectedAvatarName.textContent = getAvatarById(appState.selectedAvatarId).name;
 
   el.avatarPicker.querySelectorAll("[data-avatar]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -152,6 +213,58 @@ function setupAvatarPicker() {
   });
 }
 
+function worldOffset(progress) {
+  return Math.min(220, Math.round(progress * 2.1));
+}
+
+function runnerLeft(progress) {
+  return `${Math.min(87, 10 + progress * 0.78)}%`;
+}
+
+function laneDecorations(theme, progress) {
+  const offset = worldOffset(progress);
+  const cloudOffset = Math.round(offset * 0.35);
+  const hillOffset = Math.round(offset * 0.6);
+  const brickOffset = Math.round(offset * 0.95);
+  return `
+    <div class="lane-backdrop">
+      <div class="parallax-layer layer-clouds" style="transform:translateX(-${cloudOffset}px)"></div>
+      <div class="parallax-layer layer-hills" style="transform:translateX(-${hillOffset}px)"></div>
+      <div class="parallax-layer layer-bricks" style="transform:translateX(-${brickOffset}px)"></div>
+      <div class="ground-strip"></div>
+      <div class="pixel-pipe" style="left:18%"></div>
+      <div class="pixel-pipe" style="left:48%"></div>
+      <div class="pixel-pipe" style="left:69%"></div>
+      ${laneZones
+        .map(
+          (zone) => `
+            <div class="zone ${zone.type}" style="left:${zone.position}%">${zone.icon}</div>
+          `
+        )
+        .join("")}
+      <div class="finish-flag"></div>
+      <div class="finish-castle"></div>
+    </div>
+  `;
+}
+
+function getPhaseLabel() {
+  if (appState.gamePhase === "countdown") return "COUNTDOWN";
+  if (appState.gamePhase === "racing") return "RACING";
+  if (appState.gamePhase === "finished") return "FINISH";
+  return "LOBBY";
+}
+
+function renderCountdownOverlay() {
+  if (appState.gamePhase !== "countdown" || !appState.countdownValue) {
+    el.countdownOverlay.classList.add("hidden");
+    return;
+  }
+  el.countdownOverlay.classList.remove("hidden");
+  el.countdownNumber.textContent = appState.countdownValue;
+  el.countdownLabel.textContent = appState.countdownValue === "GO!" ? "RUN!" : "READY";
+}
+
 function renderHostTrack() {
   const players = [...appState.players.values()].sort((a, b) => {
     if (b.progress !== a.progress) return b.progress - a.progress;
@@ -159,14 +272,22 @@ function renderHostTrack() {
   });
 
   el.playerCount.textContent = String(players.length);
+  el.hudPlayers.textContent = String(players.length);
+  el.hudMode.textContent = getPhaseLabel();
 
   if (!players.length) {
     el.track.innerHTML = `
-      <div class="lane">
-        <div class="lane-header">
-          <div class="lane-meta">
-            <strong>等待玩家加入</strong>
-            <span>掃描 QR Code 後就會出現在這裡</span>
+      <div class="lane theme-sky">
+        <div class="lane-stage">
+          ${laneDecorations("sky", 0)}
+          <div class="lane-header">
+            <div class="lane-player">
+              <div class="lane-meta">
+                <strong>等待玩家加入</strong>
+                <span>掃描 QR Code 後就會出現在舞台上</span>
+              </div>
+            </div>
+            <div class="lane-rank">LOBBY</div>
           </div>
         </div>
       </div>
@@ -174,38 +295,40 @@ function renderHostTrack() {
     el.podium.innerHTML = "";
     el.raceSummary.textContent = "等待玩家加入...";
     el.startRaceButton.disabled = true;
+    renderCountdownOverlay();
     return;
   }
 
-  el.startRaceButton.disabled = players.length < 2;
+  el.startRaceButton.disabled = players.length < 2 || appState.gamePhase === "countdown";
 
-  const laneMarkup = players
+  el.track.innerHTML = players
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
-      const left = `${Math.min(90, 5 + player.progress * 0.85)}%`;
-      const effectLabel = player.effect === "boost" ? "星星加速中" : player.effect === "trap" ? "泥巴中" : "穩定衝刺";
+      const theme = themeForIndex(index);
+      const effectLabel =
+        player.effect === "boost" ? "STAR BOOST" : player.effect === "trap" ? "MUD TRAP" : "RUNNING";
+      const runnerClass = [
+        "runner",
+        player.effect === "boost" ? "is-boosting" : "",
+        player.effect === "trap" ? "is-trapped" : ""
+      ]
+        .filter(Boolean)
+        .join(" ");
       return `
-        <div class="lane">
-          <div class="lane-header">
-            <div class="lane-player">
-              <div class="avatar-badge">${avatarSvg(avatar)}</div>
-              <div class="lane-meta">
-                <strong>${escapeHtml(player.name)}</strong>
-                <span>${effectLabel} · 進度 ${Math.round(player.progress)} / ${FINISH_DISTANCE}</span>
+        <div class="lane theme-${theme}">
+          <div class="lane-stage">
+            ${laneDecorations(theme, player.progress)}
+            <div class="lane-header">
+              <div class="lane-player">
+                <div class="avatar-badge">${avatarSvg(avatar)}</div>
+                <div class="lane-meta">
+                  <strong>${escapeHtml(player.name)}</strong>
+                  <span>${effectLabel} · ${Math.round(player.progress)} / ${FINISH_DISTANCE}</span>
+                </div>
               </div>
+              <div class="lane-rank">${formatRank(index)}</div>
             </div>
-            <div class="lane-rank">${formatRank(index)}</div>
-          </div>
-          <div class="track-strip">
-            ${laneZones
-              .map(
-                (zone) => `
-                <div class="zone ${zone.type}" style="left:${zone.position}%">${zone.icon}</div>
-              `
-              )
-              .join("")}
-            <div class="finish-line"></div>
-            <div class="runner" style="left:${left}">
+            <div class="${runnerClass}" style="left:${runnerLeft(player.progress)}">
               <div class="runner-avatar">${avatarSvg(avatar)}</div>
               <div class="runner-label">${escapeHtml(player.name)}</div>
             </div>
@@ -215,14 +338,12 @@ function renderHostTrack() {
     })
     .join("");
 
-  el.track.innerHTML = laneMarkup;
-
   const winners = players.slice(0, 3);
   el.podium.innerHTML = winners
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
       return `
-        <div class="podium-card">
+        <div class="podium-card" data-rank="${index + 1}">
           <div class="avatar-badge">${avatarSvg(avatar)}</div>
           <div>
             <strong>${formatRank(index)} · ${escapeHtml(player.name)}</strong>
@@ -233,33 +354,40 @@ function renderHostTrack() {
     })
     .join("");
 
-  if (!appState.raceStarted) {
-    el.raceSummary.textContent = players.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始比賽";
-  } else if (appState.winnerId) {
+  if (appState.gamePhase === "countdown") {
+    el.raceSummary.textContent = "倒數開始，準備衝刺...";
+  } else if (appState.gamePhase === "finished" && appState.winnerId) {
     const winner = appState.players.get(appState.winnerId);
-    el.raceSummary.textContent = `${winner?.name || "有人"} 奪下冠軍了！`;
+    el.raceSummary.textContent = `${winner?.name || "有人"} 抵達終點城堡！`;
+  } else if (appState.gamePhase === "racing") {
+    el.raceSummary.textContent = "比賽進行中，大家正在全力衝刺...";
   } else {
-    el.raceSummary.textContent = "比賽進行中，大家正在狂按衝刺...";
+    el.raceSummary.textContent = players.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始比賽";
   }
+
+  renderCountdownOverlay();
 }
 
 function renderPlayerPreview(state = appState.localPlayer) {
   if (!state) return;
   const avatar = getAvatarById(state.avatarId);
-  const left = `${Math.min(90, 5 + state.progress * 0.85)}%`;
+  const theme = "sky";
+  const runnerClass = [
+    "runner",
+    state.effect === "boost" ? "is-boosting" : "",
+    state.effect === "trap" ? "is-trapped" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   el.playerLanePreview.innerHTML = `
-    <div class="track-strip">
-      ${laneZones
-        .map(
-          (zone) => `
-          <div class="zone ${zone.type}" style="left:${zone.position}%">${zone.icon}</div>
-        `
-        )
-        .join("")}
-      <div class="finish-line"></div>
-      <div class="runner" style="left:${left}">
-        <div class="runner-avatar">${avatarSvg(avatar)}</div>
-        <div class="runner-label">${escapeHtml(state.name)}</div>
+    <div class="lane theme-${theme}">
+      <div class="lane-stage">
+        ${laneDecorations(theme, state.progress)}
+        <div class="${runnerClass}" style="left:${runnerLeft(state.progress)}">
+          <div class="runner-avatar">${avatarSvg(avatar)}</div>
+          <div class="runner-label">${escapeHtml(state.name)}</div>
+        </div>
       </div>
     </div>
   `;
@@ -278,6 +406,8 @@ function broadcastState() {
     type: "state",
     raceStarted: appState.raceStarted,
     winnerId: appState.winnerId,
+    gamePhase: appState.gamePhase,
+    countdownValue: appState.countdownValue,
     players: [...appState.players.values()]
   };
   sendToAll(payload);
@@ -285,8 +415,12 @@ function broadcastState() {
 }
 
 function resetRace() {
+  clearTimeout(appState.countdownTimer);
+  appState.countdownTimer = null;
   appState.raceStarted = false;
   appState.winnerId = null;
+  appState.gamePhase = "lobby";
+  appState.countdownValue = "";
   appState.players.forEach((player) => {
     player.progress = 0;
     player.effect = "ready";
@@ -296,18 +430,18 @@ function resetRace() {
 }
 
 function applyZoneEffects(nextProgress) {
-  const hitZone = laneZones.find((zone) => Math.abs(nextProgress - zone.position) <= 2.8);
+  const hitZone = laneZones.find((zone) => Math.abs(nextProgress - zone.position) <= 3);
   if (!hitZone) {
     return { progress: nextProgress, effect: "normal" };
   }
   if (hitZone.type === "boost") {
     return { progress: Math.min(FINISH_DISTANCE, nextProgress + BOOST_STEP), effect: "boost" };
   }
-  return { progress: Math.max(0, nextProgress - 4), effect: "trap" };
+  return { progress: Math.max(0, nextProgress - 5), effect: "trap" };
 }
 
 function handleHop(playerId) {
-  if (!appState.raceStarted || appState.winnerId) return;
+  if (!appState.raceStarted || appState.gamePhase !== "racing" || appState.winnerId) return;
   const player = appState.players.get(playerId);
   if (!player) return;
 
@@ -323,10 +457,42 @@ function handleHop(playerId) {
   if (player.progress >= FINISH_DISTANCE && !appState.winnerId) {
     appState.winnerId = playerId;
     appState.raceStarted = false;
+    appState.gamePhase = "finished";
+    appState.countdownValue = "";
     sendToAll({ type: "winner", winnerId: playerId, winnerName: player.name });
+    playVictoryFanfare();
   }
 
   broadcastState();
+}
+
+function runCountdown(index = 0) {
+  if (index >= COUNTDOWN_STEPS.length) {
+    appState.countdownValue = "";
+    appState.gamePhase = "racing";
+    appState.raceStarted = true;
+    broadcastState();
+    status("開跑！");
+    return;
+  }
+
+  appState.gamePhase = "countdown";
+  appState.raceStarted = false;
+  appState.countdownValue = COUNTDOWN_STEPS[index];
+  playCountdownTone(COUNTDOWN_STEPS[index]);
+  broadcastState();
+  appState.countdownTimer = setTimeout(() => runCountdown(index + 1), COUNTDOWN_STEPS[index] === "GO!" ? 550 : 800);
+}
+
+function startCountdown() {
+  clearTimeout(appState.countdownTimer);
+  appState.winnerId = null;
+  appState.players.forEach((player) => {
+    player.progress = 0;
+    player.effect = "ready";
+    player.lastHopAt = 0;
+  });
+  runCountdown(0);
 }
 
 function registerConnection(connection) {
@@ -349,6 +515,8 @@ function registerConnection(connection) {
         type: "joined",
         raceStarted: appState.raceStarted,
         winnerId: appState.winnerId,
+        gamePhase: appState.gamePhase,
+        countdownValue: appState.countdownValue,
         player,
         players: [...appState.players.values()]
       });
@@ -368,8 +536,8 @@ function registerConnection(connection) {
       appState.players.delete(playerId);
       if (playerId === appState.winnerId) {
         appState.winnerId = null;
+        appState.gamePhase = "lobby";
       }
-      renderHostTrack();
       broadcastState();
     }
   });
@@ -390,7 +558,7 @@ function startHostMode() {
     appState.joinUrl = buildJoinUrl(id);
     el.roomCode.textContent = appState.joinCode;
     el.joinUrl.textContent = appState.joinUrl;
-    status("房間建立成功，讓大家掃 QR Code 加入吧。");
+    status("房間建立成功，讓大家掃 QR Code 加入。");
     renderHostTrack();
 
     el.qrCode.innerHTML = "";
@@ -416,20 +584,39 @@ function startHostMode() {
 function updatePlayerStatus() {
   if (!appState.localPlayer) return;
   const winner = appState.winnerId ? appState.localPlayer.id === appState.winnerId : false;
-  if (!appState.raceStarted && !appState.winnerId) {
-    el.controllerHint.textContent = "等待房主開始比賽，開始後狂按按鈕，讓角色一路跳到終點。";
+
+  if (appState.gamePhase === "countdown") {
+    el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備好狂按 RUN。`;
+    el.boostButton.disabled = true;
+  } else if (appState.gamePhase === "lobby") {
+    el.controllerHint.textContent = "等待房主開始比賽，倒數結束後狂按按鈕衝向終點。";
     el.boostButton.disabled = true;
   } else if (winner) {
-    el.controllerHint.textContent = "你是冠軍！可以等房主重設再玩一局。";
+    el.controllerHint.textContent = "你是冠軍！等房主重設後可以再玩一局。";
     el.boostButton.disabled = true;
   } else if (appState.winnerId) {
-    const winnerName = appState.localPlayerSnapshot?.find?.((item) => item.id === appState.winnerId)?.name;
-    el.controllerHint.textContent = `${winnerName || "有人"} 已經先到終點，等房主重設下一局。`;
+    const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
+    el.controllerHint.textContent = `${winnerName || "有人"} 已經先到終點城堡，等房主重設下一局。`;
     el.boostButton.disabled = true;
   } else {
-    el.controllerHint.textContent = "現在就狂按衝刺，踩到星星會大加速，踩進泥巴會慢下來。";
+    el.controllerHint.textContent = "現在狂按 RUN，踩到星星會暴衝，踩進泥巴會慢下來。";
     el.boostButton.disabled = false;
   }
+}
+
+function applyRemoteState(message) {
+  appState.raceStarted = message.raceStarted;
+  appState.winnerId = message.winnerId;
+  appState.gamePhase = message.gamePhase || "lobby";
+  appState.countdownValue = message.countdownValue || "";
+  appState.localPlayerSnapshot = message.players;
+  const latest = message.players.find((player) => player.id === appState.playerId);
+  if (latest) {
+    appState.localPlayer = latest;
+    renderPlayerPreview(latest);
+  }
+  renderCountdownOverlay();
+  updatePlayerStatus();
 }
 
 function startPlayerMode(hostId) {
@@ -458,6 +645,9 @@ function startPlayerMode(hostId) {
       if (message.type === "joined") {
         appState.localPlayer = message.player;
         appState.localPlayerSnapshot = message.players;
+        appState.gamePhase = message.gamePhase || "lobby";
+        appState.countdownValue = message.countdownValue || "";
+        appState.winnerId = message.winnerId;
         el.joinPanel.classList.add("hidden");
         el.controllerPanel.classList.remove("hidden");
         el.playerGreeting.textContent = `${message.player.name}，準備衝刺`;
@@ -467,19 +657,12 @@ function startPlayerMode(hostId) {
       }
 
       if (message.type === "state") {
-        appState.raceStarted = message.raceStarted;
-        appState.winnerId = message.winnerId;
-        appState.localPlayerSnapshot = message.players;
-        const latest = message.players.find((player) => player.id === appState.playerId);
-        if (latest) {
-          appState.localPlayer = latest;
-          renderPlayerPreview(latest);
-        }
-        updatePlayerStatus();
+        applyRemoteState(message);
       }
 
       if (message.type === "winner") {
         appState.winnerId = message.winnerId;
+        playVictoryFanfare();
         updatePlayerStatus();
       }
     });
@@ -507,19 +690,13 @@ function wireEvents() {
   });
 
   el.startRaceButton.addEventListener("click", () => {
+    getAudioContext();
     if (appState.players.size < 2) {
       status("至少要 2 位玩家才能開始。");
       return;
     }
-    appState.raceStarted = true;
-    appState.winnerId = null;
-    appState.players.forEach((player) => {
-      player.progress = 0;
-      player.effect = "normal";
-      player.lastHopAt = 0;
-    });
-    broadcastState();
-    status("比賽開始！");
+    startCountdown();
+    status("倒數開始！");
   });
 
   el.resetRaceButton.addEventListener("click", () => {
@@ -531,6 +708,7 @@ function wireEvents() {
   el.joinButton.addEventListener("click", () => {
     const name = el.playerName.value.trim() || "Player";
     const avatar = getAvatarById(appState.selectedAvatarId);
+    getAudioContext();
     appState.hostConnection.send({
       type: "join",
       player: {
@@ -543,8 +721,10 @@ function wireEvents() {
   });
 
   const hop = () => {
+    getAudioContext();
     if (!appState.hostConnection?.open || !appState.localPlayer || el.boostButton.disabled) return;
     appState.hostConnection.send({ type: "hop", playerId: appState.playerId });
+    playTone(520, 0.04, "square", 0.03);
   };
 
   el.boostButton.addEventListener("pointerdown", hop);
@@ -553,6 +733,8 @@ function wireEvents() {
 
 function init() {
   wireEvents();
+  renderCountdownOverlay();
+
   const params = new URLSearchParams(window.location.search);
   const join = params.get("join");
 
