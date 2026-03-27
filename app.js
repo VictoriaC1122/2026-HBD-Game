@@ -145,6 +145,58 @@ function randomRoomCode(peerId) {
   return peerId.slice(-6).toUpperCase();
 }
 
+function qrServiceUrl(text, size = 220) {
+  return `https://quickchart.io/qr?text=${encodeURIComponent(text)}&size=${size}`;
+}
+
+function renderQrFallback(url) {
+  el.qrCode.innerHTML = "";
+  const image = document.createElement("img");
+  image.src = qrServiceUrl(url);
+  image.width = 220;
+  image.height = 220;
+  image.alt = "加入房間 QR Code";
+  image.loading = "eager";
+  image.decoding = "async";
+  el.qrCode.append(image);
+}
+
+async function renderQrCode(url) {
+  const qrApi = window.QRCode || globalThis.QRCode;
+
+  el.qrCode.innerHTML = "";
+
+  if (qrApi?.toDataURL) {
+    try {
+      const dataUrl = await qrApi.toDataURL(url, { width: 220, margin: 1 });
+      const image = document.createElement("img");
+      image.src = dataUrl;
+      image.width = 220;
+      image.height = 220;
+      image.alt = "加入房間 QR Code";
+      image.loading = "eager";
+      image.decoding = "async";
+      el.qrCode.append(image);
+      return true;
+    } catch (_error) {
+    }
+  }
+
+  if (qrApi?.toCanvas) {
+    try {
+      const canvas = document.createElement("canvas");
+      await qrApi.toCanvas(canvas, url, { width: 220, margin: 1 });
+      el.qrCode.append(canvas);
+      return true;
+    } catch (_error) {
+    }
+  }
+
+  renderQrFallback(url);
+  status("已改用備援 QR Code 服務，仍可正常掃碼加入。");
+  return false;
+}
+
 function getAudioContext() {
   if (!window.AudioContext && !window.webkitAudioContext) return null;
   if (!appState.audioContext) {
@@ -562,16 +614,7 @@ function startHostMode() {
     el.joinUrl.textContent = appState.joinUrl;
     status("房間建立成功，讓大家掃 QR Code 加入。");
     renderHostTrack();
-
-    el.qrCode.innerHTML = "";
-    const canvas = document.createElement("canvas");
-    el.qrCode.append(canvas);
-    try {
-      await window.QRCode.toCanvas(canvas, appState.joinUrl, { width: 220, margin: 1 });
-    } catch (error) {
-      el.qrCode.textContent = "QR Code 產生失敗";
-      status(`QR Code 建立失敗：${error?.message || "unknown error"}`);
-    }
+    await renderQrCode(appState.joinUrl);
   });
 
   peer.on("connection", (connection) => {
