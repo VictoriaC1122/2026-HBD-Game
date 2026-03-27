@@ -1552,7 +1552,7 @@ button {
 .controller-deck {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(160px, 0.8fr);
-  gap: 12px;
+  gap: 14px;
 }
 
 .control-cluster {
@@ -1573,15 +1573,29 @@ button {
 
 .movement-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "jump jump"
+    "left right";
+  align-items: end;
+}
+
+.movement-spacer {
+  display: none;
+}
+
+.movement-cluster .control-cluster-label {
+  margin-bottom: 14px;
 }
 
 .attack-cluster {
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .attack-cluster .boost-button {
   flex: 1;
+  min-height: 212px;
 }
 
 .boost-button {
@@ -1617,16 +1631,65 @@ button {
 .move-button {
   background: linear-gradient(180deg, #c3ecff 0 14%, #66b0ff 14% 80%, #2356c9 80% 100%);
   box-shadow: 0 10px 0 #16347e, inset 0 2px 0 rgba(255,255,255,0.42);
+  min-height: 120px;
 }
 
 .jump-button {
   background: linear-gradient(180deg, #ffe799 0 14%, #f4a44b 14% 80%, #d54b38 80% 100%);
   box-shadow: 0 10px 0 #9a3322, inset 0 2px 0 rgba(255,255,255,0.38);
+  min-height: 96px;
 }
 
 .attack-button {
   background: linear-gradient(180deg, #ffbadf 0 14%, #f0607d 14% 80%, #a61f37 80% 100%);
   box-shadow: 0 10px 0 #681526, inset 0 2px 0 rgba(255,255,255,0.32);
+  border-radius: 28px;
+}
+
+#leftButton {
+  grid-area: left;
+}
+
+#rightButton {
+  grid-area: right;
+}
+
+#jumpButton {
+  grid-area: jump;
+  width: min(190px, 62%);
+  justify-self: center;
+}
+
+.move-button span {
+  font-size: clamp(42px, 9vw, 60px);
+}
+
+.jump-button span {
+  font-size: clamp(34px, 8vw, 52px);
+}
+
+.attack-button span {
+  font-size: clamp(48px, 10vw, 68px);
+}
+
+.attack-button small {
+  font-size: 18px;
+}
+
+.attack-cluster .control-cluster-label {
+  text-align: center;
+}
+
+.movement-cluster {
+  background:
+    radial-gradient(circle at 50% 100%, rgba(102,176,255,0.12), transparent 40%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,244,255,0.88));
+}
+
+.attack-cluster {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(240,96,125,0.18), transparent 42%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(252,237,242,0.9));
 }
 
 .boost-button:active {
@@ -1663,6 +1726,10 @@ button {
 
   .controller-deck {
     grid-template-columns: 1fr;
+  }
+
+  .attack-cluster .boost-button {
+    min-height: 150px;
   }
 }
 
@@ -1716,6 +1783,12 @@ button {
     gap: 10px;
   }
 
+  .movement-grid {
+    grid-template-areas:
+      "jump jump"
+      "left right";
+  }
+
   .tutorial-card {
     padding: 18px;
   }
@@ -1731,6 +1804,18 @@ button {
 
   .boost-button small {
     font-size: 12px;
+  }
+
+  #jumpButton {
+    width: min(180px, 72%);
+  }
+
+  .attack-button {
+    border-radius: 22px;
+  }
+
+  .attack-button small {
+    font-size: 16px;
   }
 
   .battle-map {
