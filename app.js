@@ -186,6 +186,25 @@ function getAvatarById(id) {
   return avatarDefinitions.find((avatar) => avatar.id === id) || avatarDefinitions[0];
 }
 
+function getAvatarProfile(avatarId) {
+  const avatar = getAvatarById(avatarId);
+  const profiles = {
+    rose: { title: "烈焰劍冠", attack: "#ff8a94", glow: "rgba(255, 138, 148, 0.75)", burst: "#fff0a5", sound: [280, 420] },
+    mint: { title: "風息弓姬", attack: "#8de5c1", glow: "rgba(141, 229, 193, 0.75)", burst: "#dfffea", sound: [360, 520] },
+    pixel: { title: "流光影刃", attack: "#ffb266", glow: "rgba(255, 178, 102, 0.75)", burst: "#fff2cc", sound: [300, 610] },
+    nova: { title: "蒼穹騎士", attack: "#8bb6ff", glow: "rgba(139, 182, 255, 0.75)", burst: "#e6f0ff", sound: [250, 470] },
+    mango: { title: "叢林槍鋒", attack: "#ffd166", glow: "rgba(255, 209, 102, 0.75)", burst: "#fff4c4", sound: [230, 430] },
+    aqua: { title: "潮汐船長", attack: "#72ddf7", glow: "rgba(114, 221, 247, 0.75)", burst: "#dff8ff", sound: [260, 500] },
+    cocoa: { title: "拳風鬥士", attack: "#d79a73", glow: "rgba(215, 154, 115, 0.75)", burst: "#f7e3d5", sound: [210, 360] },
+    violet: { title: "星塵法皇", attack: "#be97ff", glow: "rgba(190, 151, 255, 0.78)", burst: "#efe5ff", sound: [390, 680] },
+    pearl: { title: "晨曦祭司", attack: "#ffbe7a", glow: "rgba(255, 190, 122, 0.76)", burst: "#fff0d7", sound: [330, 560] },
+    leaf: { title: "森語獵手", attack: "#9ed36a", glow: "rgba(158, 211, 106, 0.76)", burst: "#eefbd9", sound: [270, 480] },
+    ember: { title: "燼火刺客", attack: "#ff7b5a", glow: "rgba(255, 123, 90, 0.78)", burst: "#ffe1d8", sound: [320, 640] },
+    glow: { title: "新星機匠", attack: "#85f4ff", glow: "rgba(133, 244, 255, 0.78)", burst: "#e2fdff", sound: [300, 540] }
+  };
+  return { avatar, ...(profiles[avatar.id] || profiles.rose) };
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => {
     const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -303,9 +322,10 @@ function playHitTone() {
   setTimeout(() => playTone(130, 0.09, "square", 0.045), 18);
 }
 
-function playAttackSwingTone() {
-  playTone(340, 0.05, "sawtooth", 0.05);
-  setTimeout(() => playTone(520, 0.04, "triangle", 0.035), 24);
+function playAttackSwingTone(avatarId = "rose") {
+  const profile = getAvatarProfile(avatarId);
+  playTone(profile.sound[0], 0.05, "sawtooth", 0.05);
+  setTimeout(() => playTone(profile.sound[1], 0.04, "triangle", 0.035), 24);
 }
 
 function playStepTone(direction) {
@@ -581,12 +601,13 @@ function advanceLocalPhysics(now) {
   }
 }
 
-function addDamageBurst(x, amount, crit = false) {
+function addDamageBurst(x, amount, crit = false, avatarId = "rose") {
   appState.damageBursts.push({
     id: crypto.randomUUID(),
     x,
     amount,
     crit,
+    avatarId,
     createdAt: Date.now()
   });
   if (appState.damageBursts.length > 10) {
@@ -691,11 +712,12 @@ function renderBattleArena(players) {
   updateHostUx(sorted.length, alivePlayers.length);
 
   const damageMarkup = appState.damageBursts
-    .map(
-      (burst) => `
-        <div class="damage-burst ${burst.crit ? "crit" : ""}" style="left:${burst.x}%">-${burst.amount}</div>
-      `
-    )
+    .map((burst) => {
+      const profile = getAvatarProfile(burst.avatarId);
+      return `
+        <div class="damage-burst ${burst.crit ? "crit" : ""}" style="left:${burst.x}%; --burst-main:${profile.attack}; --burst-glow:${profile.glow}; --burst-text:${profile.burst}">-${burst.amount}</div>
+      `;
+    })
     .join("");
 
   if (!sorted.length) {
@@ -720,6 +742,7 @@ function renderBattleArena(players) {
   const fighterMarkup = sorted
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
+      const profile = getAvatarProfile(player.avatarId);
       const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
       const fighterClass = [
         "battle-fighter",
@@ -735,7 +758,7 @@ function renderBattleArena(players) {
         .join(" ");
 
       return `
-        <div class="${fighterClass}" style="left:${player.x}%; bottom:${playerBottom(index)}px">
+        <div class="${fighterClass}" style="left:${player.x}%; bottom:${playerBottom(index)}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
           <div class="fighter-name">${escapeHtml(crowdedMode ? player.name.slice(0, 8) : player.name)}</div>
           <div class="fighter-hp-bar">
             <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
@@ -761,6 +784,7 @@ function renderBattleArena(players) {
       </div>
       ${fighterMarkup}
       ${damageMarkup}
+      ${appState.gamePhase === "finished" && appState.winnerId ? renderWinnerShowcase() : ""}
     </div>
   `;
 
@@ -784,6 +808,7 @@ function renderPlayerPreview(player = appState.localPlayer) {
   if (!player) return;
   appState.needsRender = false;
   const avatar = getAvatarById(player.avatarId);
+  const profile = getAvatarProfile(player.avatarId);
   const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
   const fighterClass = [
     "battle-fighter",
@@ -800,7 +825,7 @@ function renderPlayerPreview(player = appState.localPlayer) {
   el.playerLanePreview.innerHTML = `
     <div class="battle-map preview-map">
       ${arenaDecorations()}
-      <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:74px">
+      <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:74px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
         <div class="fighter-name">${escapeHtml(player.name)}</div>
         <div class="fighter-hp-bar">
           <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
@@ -808,6 +833,22 @@ function renderPlayerPreview(player = appState.localPlayer) {
         <div class="fighter-meta">${Math.max(0, player.hp)} HP</div>
         <div class="runner-avatar">${avatarSvg(avatar)}</div>
         <div class="fighter-status">${combatStatusText(player)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWinnerShowcase() {
+  const winner = appState.players.get(appState.winnerId);
+  if (!winner) return "";
+  const profile = getAvatarProfile(winner.avatarId);
+  return `
+    <div class="winner-showcase">
+      <div class="winner-card" style="--winner-main:${profile.attack}; --winner-glow:${profile.glow}">
+        <div class="winner-badge">WINNER</div>
+        <div class="winner-avatar">${avatarSvg(profile.avatar)}</div>
+        <strong>${escapeHtml(winner.name)}</strong>
+        <span>${profile.title}</span>
       </div>
     </div>
   `;
@@ -950,7 +991,7 @@ function applyAttack(playerId) {
     target.moveIntent = 0;
     target.x = clampX(target.x + target.velocityX * 1.1);
     attacker.velocityX = attacker.direction === "right" ? 1.1 : -1.1;
-    addDamageBurst(target.x, damage, damage >= 24);
+    addDamageBurst(target.x, damage, damage >= 24, attacker.avatarId);
     anyHit = true;
 
     if (target.hp <= 0) {
@@ -1362,7 +1403,7 @@ function wireEvents() {
     appState.lastLocalAttackAt = now;
     optimisticAttack();
     appState.hostConnection.send({ type: "attack", playerId: appState.playerId });
-    playAttackSwingTone();
+    playAttackSwingTone(appState.localPlayer.avatarId);
   };
 
   const bindMoveButton = (button, direction) => {
