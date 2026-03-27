@@ -1,10 +1,16 @@
 const MAX_HP = 100;
-const MOVE_STEP = 2.1;
+const MAX_RUN_SPEED = 2.9;
+const GROUND_ACCEL = 0.52;
+const AIR_ACCEL = 0.34;
+const GROUND_FRICTION = 0.72;
+const AIR_DRAG = 0.9;
+const STOP_SPEED = 0.06;
+const PHYSICS_FRAME = 1000 / 30;
+const STATE_SYNC_INTERVAL = 1000 / 15;
 const ATTACK_RANGE = 11;
 const ATTACK_DAMAGE_MIN = 15;
 const ATTACK_DAMAGE_MAX = 28;
 const ATTACK_COOLDOWN = 620;
-const MOVE_COOLDOWN = 55;
 const JUMP_COOLDOWN = 680;
 const JUMP_AIR_TIME = 700;
 const HIT_STUN = 360;
@@ -52,7 +58,9 @@ const appState = {
   localMoveTimer: null,
   renderLoopStarted: false,
   needsRender: true,
-  lastRenderAt: 0
+  lastRenderAt: 0,
+  lastPhysicsAt: 0,
+  lastStateSyncAt: 0
 };
 
 const el = {
@@ -308,6 +316,115 @@ function clampX(x) {
   return Math.max(6, Math.min(94, x));
 }
 
+function movementIntent(direction) {
+  return direction === "left" ? -1 : 1;
+}
+
+function setPlayerMoveIntent(player, direction) {
+  if (!player || player.dead) return false;
+  const nextIntent = direction ? movementIntent(direction) : 0;
+  const previousIntent = player.moveIntent || 0;
+  if (nextIntent && player.direction !== direction) {
+    player.direction = direction;
+  }
+  player.moveIntent = nextIntent;
+  return previousIntent !== nextIntent;
+}
+
+function releasePlayerMoveIntent(player, direction = null) {
+  if (!player) return false;
+  if (!direction) {
+    const changed = Boolean(player.moveIntent);
+    player.moveIntent = 0;
+    return changed;
+  }
+  const intended = movementIntent(direction);
+  if ((player.moveIntent || 0) !== intended) return false;
+  player.moveIntent = 0;
+  return true;
+}
+
+function stepPlayerMotion(player, deltaScale, now = Date.now()) {
+  if (!player) return false;
+  const previousX = player.x;
+  const previousVelocity = player.velocityX || 0;
+  const previousDirection = player.direction;
+
+  if (player.dead || appState.gamePhase !== "battle") {
+    player.moveIntent = 0;
+    player.velocityX = 0;
+    return previousVelocity !== 0;
+  }
+
+  const airborne = isAirborne(player, now);
+  const stunned = now < (player.hitUntil || 0);
+  const intent = stunned ? 0 : (player.moveIntent || 0);
+  const targetVelocity = intent * MAX_RUN_SPEED;
+  const acceleration = (airborne ? AIR_ACCEL : GROUND_ACCEL) * deltaScale;
+
+  if (intent !== 0) {
+    const velocityDelta = targetVelocity - (player.velocityX || 0);
+    player.velocityX = (player.velocityX || 0) + Math.sign(velocityDelta) * Math.min(Math.abs(velocityDelta), acceleration);
+    player.direction = intent < 0 ? "left" : "right";
+  } else {
+    player.velocityX = (player.velocityX || 0) * Math.pow(airborne ? AIR_DRAG : GROUND_FRICTION, deltaScale);
+    if (Math.abs(player.velocityX) < STOP_SPEED) {
+      player.velocityX = 0;
+    }
+  }
+
+  const nextX = clampX(player.x + (player.velocityX || 0) * deltaScale);
+  if (nextX === 6 || nextX === 94) {
+    player.velocityX = 0;
+  }
+  player.x = nextX;
+
+  return Math.abs(player.x - previousX) > 0.01 || Math.abs((player.velocityX || 0) - previousVelocity) > 0.01 || previousDirection !== player.direction;
+}
+
+function advanceArenaPhysics(now) {
+  if (appState.mode !== "host") return;
+  if (!appState.lastPhysicsAt) {
+    appState.lastPhysicsAt = now;
+    return;
+  }
+
+  const elapsed = now - appState.lastPhysicsAt;
+  if (elapsed < PHYSICS_FRAME) return;
+  const deltaScale = Math.min(2.2, Math.max(0.8, elapsed / 16.67));
+  appState.lastPhysicsAt = now;
+
+  let changed = false;
+  appState.players.forEach((player) => {
+    changed = stepPlayerMotion(player, deltaScale, now) || changed;
+  });
+
+  if (!changed) return;
+  appState.needsRender = true;
+
+  if (now - appState.lastStateSyncAt >= STATE_SYNC_INTERVAL) {
+    appState.lastStateSyncAt = now;
+    broadcastState();
+  }
+}
+
+function advanceLocalPhysics(now) {
+  if (appState.mode !== "player" || !appState.localPlayer) return;
+  if (!appState.lastPhysicsAt) {
+    appState.lastPhysicsAt = now;
+    return;
+  }
+
+  const elapsed = now - appState.lastPhysicsAt;
+  if (elapsed < PHYSICS_FRAME) return;
+  const deltaScale = Math.min(2.2, Math.max(0.8, elapsed / 16.67));
+  appState.lastPhysicsAt = now;
+
+  if (stepPlayerMotion(appState.localPlayer, deltaScale, now)) {
+    appState.needsRender = true;
+  }
+}
+
 function addDamageBurst(x, amount, crit = false) {
   appState.damageBursts.push({
     id: crypto.randomUUID(),
@@ -350,6 +467,8 @@ function startRenderLoop() {
   const tick = () => {
     const now = Date.now();
     pruneDamageBursts();
+    advanceArenaPhysics(now);
+    advanceLocalPhysics(now);
     const shouldRender = appState.needsRender || hasLiveEffects();
 
     if (shouldRender && now - appState.lastRenderAt >= 33 && appState.mode === "host") {
@@ -448,6 +567,7 @@ function renderBattleArena(players) {
       const fighterClass = [
         "battle-fighter",
         crowdedMode ? "is-compact" : "",
+        Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
         player.dead ? "is-dead" : "",
         isAirborne(player) ? "is-jumping" : "",
         (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
@@ -512,6 +632,7 @@ function renderPlayerPreview(player = appState.localPlayer) {
   const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
   const fighterClass = [
     "battle-fighter",
+    Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
     player.dead ? "is-dead" : "",
     isAirborne(player) ? "is-jumping" : "",
     (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
@@ -573,7 +694,8 @@ function createPlayer(messagePlayer) {
     airborneUntil: 0,
     attackingUntil: 0,
     hitUntil: 0,
-    lastMoveAt: 0,
+    moveIntent: 0,
+    velocityX: 0,
     lastJumpAt: 0,
     lastAttackAt: 0
   };
@@ -595,10 +717,13 @@ function resetBattle() {
     player.airborneUntil = 0;
     player.attackingUntil = 0;
     player.hitUntil = 0;
-    player.lastMoveAt = 0;
+    player.moveIntent = 0;
+    player.velocityX = 0;
     player.lastJumpAt = 0;
     player.lastAttackAt = 0;
   });
+  appState.lastPhysicsAt = 0;
+  appState.lastStateSyncAt = 0;
   broadcastState();
 }
 
@@ -619,16 +744,21 @@ function maybeDeclareWinner() {
   }
 }
 
-function applyMove(playerId, direction) {
+function applyMoveStart(playerId, direction) {
   if (appState.gamePhase !== "battle") return;
   const player = appState.players.get(playerId);
+  if (!player || player.dead || Date.now() < (player.hitUntil || 0)) return;
+  if (setPlayerMoveIntent(player, direction)) {
+    appState.needsRender = true;
+  }
+}
+
+function applyMoveStop(playerId, direction = null) {
+  const player = appState.players.get(playerId);
   if (!player || player.dead) return;
-  const now = Date.now();
-  if (now - player.lastMoveAt < MOVE_COOLDOWN || now < (player.hitUntil || 0)) return;
-  player.lastMoveAt = now;
-  player.direction = direction;
-  player.x = clampX(player.x + (direction === "left" ? -MOVE_STEP : MOVE_STEP));
-  broadcastState();
+  if (releasePlayerMoveIntent(player, direction)) {
+    appState.needsRender = true;
+  }
 }
 
 function applyJump(playerId) {
@@ -663,7 +793,10 @@ function applyAttack(playerId) {
     target.hp = Math.max(0, target.hp - damage);
     target.hitUntil = now + HIT_STUN;
     target.direction = target.x >= attacker.x ? "right" : "left";
-    target.x = clampX(target.x + (attacker.direction === "right" ? 5.6 : -5.6));
+    target.velocityX = attacker.direction === "right" ? 2.4 : -2.4;
+    target.moveIntent = 0;
+    target.x = clampX(target.x + target.velocityX * 1.1);
+    attacker.velocityX = attacker.direction === "right" ? 1.1 : -1.1;
     addDamageBurst(target.x, damage, damage >= 24);
     anyHit = true;
 
@@ -671,6 +804,8 @@ function applyAttack(playerId) {
       target.dead = true;
       target.airborneUntil = 0;
       target.attackingUntil = 0;
+      target.velocityX = 0;
+      target.moveIntent = 0;
     }
   });
 
@@ -763,14 +898,24 @@ function updatePlayerStatus() {
 
 function optimisticMove(direction) {
   if (!appState.localPlayer || appState.localPlayer.dead) return;
-  appState.localPlayer.direction = direction;
-  appState.localPlayer.x = clampX(appState.localPlayer.x + (direction === "left" ? -MOVE_STEP : MOVE_STEP));
+  setPlayerMoveIntent(appState.localPlayer, direction);
+  appState.activeMoveDirection = direction;
+  appState.needsRender = true;
+}
+
+function optimisticMoveStop(direction = null) {
+  if (!appState.localPlayer) return;
+  releasePlayerMoveIntent(appState.localPlayer, direction);
+  if (!direction || appState.activeMoveDirection === direction) {
+    appState.activeMoveDirection = null;
+  }
   appState.needsRender = true;
 }
 
 function optimisticJump() {
   if (!appState.localPlayer || appState.localPlayer.dead) return;
   appState.localPlayer.airborneUntil = Date.now() + JUMP_AIR_TIME;
+  appState.localPlayer.velocityX *= 1.04;
   appState.needsRender = true;
 }
 
@@ -780,27 +925,31 @@ function optimisticAttack() {
   appState.needsRender = true;
 }
 
-function stopMoveHold() {
+function stopMoveHold(sendMoveStop) {
+  const activeDirection = appState.activeMoveDirection;
   appState.activeMoveDirection = null;
   if (appState.localMoveTimer) {
     window.clearInterval(appState.localMoveTimer);
     appState.localMoveTimer = null;
   }
+  if (activeDirection && typeof sendMoveStop === "function") {
+    optimisticMoveStop(activeDirection);
+    sendMoveStop(activeDirection);
+  }
 }
 
-function startMoveHold(event, direction, sendMove) {
+function startMoveHold(event, direction, sendMoveStart, sendMoveStop) {
   if (event.pointerType === "mouse" && event.button !== 0) return;
   event.preventDefault();
-  stopMoveHold();
-  appState.activeMoveDirection = direction;
+  if (appState.activeMoveDirection && appState.activeMoveDirection !== direction) {
+    stopMoveHold(sendMoveStop);
+  }
   if (event.currentTarget?.setPointerCapture) {
     event.currentTarget.setPointerCapture(event.pointerId);
   }
-  sendMove(direction);
-  appState.localMoveTimer = window.setInterval(() => {
-    if (appState.activeMoveDirection !== direction) return;
-    sendMove(direction);
-  }, MOVE_COOLDOWN);
+  if (appState.activeMoveDirection === direction) return;
+  optimisticMove(direction);
+  sendMoveStart(direction);
 }
 
 function applyRemoteState(message) {
@@ -838,7 +987,11 @@ function registerConnection(connection) {
     }
 
     if (message.type === "move") {
-      applyMove(message.playerId, message.direction);
+      applyMoveStart(message.playerId, message.direction);
+    }
+
+    if (message.type === "move-stop") {
+      applyMoveStop(message.playerId, message.direction);
     }
 
     if (message.type === "jump") {
@@ -923,6 +1076,7 @@ function startPlayerMode(hostId) {
         el.controllerPanel.classList.remove("hidden");
         el.playerGreeting.textContent = `${message.player.name}，準備開打`;
         renderPlayerPreview(message.player);
+        appState.lastPhysicsAt = 0;
         updatePlayerStatus();
         status("加入成功，等待亂鬥開始。");
       }
@@ -1002,12 +1156,13 @@ function wireEvents() {
   const sendMove = (direction) => {
     if (!appState.hostConnection?.open || !appState.localPlayer) return;
     if (el.leftButton.disabled || el.rightButton.disabled || appState.gamePhase !== "battle") return;
-    const now = Date.now();
-    if (now - appState.lastLocalMoveAt < MOVE_COOLDOWN) return;
-    appState.lastLocalMoveAt = now;
-    optimisticMove(direction);
     appState.hostConnection.send({ type: "move", playerId: appState.playerId, direction });
     playTone(direction === "left" ? 260 : 280, 0.03, "square", 0.03);
+  };
+
+  const sendMoveStop = (direction) => {
+    if (!appState.hostConnection?.open || !appState.localPlayer) return;
+    appState.hostConnection.send({ type: "move-stop", playerId: appState.playerId, direction });
   };
 
   const sendJump = () => {
@@ -1031,11 +1186,12 @@ function wireEvents() {
   };
 
   const bindMoveButton = (button, direction) => {
-    button.addEventListener("pointerdown", (event) => startMoveHold(event, direction, sendMove));
-    button.addEventListener("pointerup", stopMoveHold);
-    button.addEventListener("pointercancel", stopMoveHold);
-    button.addEventListener("pointerleave", stopMoveHold);
-    button.addEventListener("lostpointercapture", stopMoveHold);
+    button.addEventListener("pointerdown", (event) => startMoveHold(event, direction, sendMove, sendMoveStop));
+    const releaseMove = () => stopMoveHold(sendMoveStop);
+    button.addEventListener("pointerup", releaseMove);
+    button.addEventListener("pointercancel", releaseMove);
+    button.addEventListener("pointerleave", releaseMove);
+    button.addEventListener("lostpointercapture", releaseMove);
     button.addEventListener("contextmenu", (event) => event.preventDefault());
   };
 
@@ -1043,8 +1199,8 @@ function wireEvents() {
   bindMoveButton(el.rightButton, "right");
   el.jumpButton.addEventListener("pointerdown", sendJump);
   el.attackButton.addEventListener("pointerdown", sendAttack);
-  window.addEventListener("pointerup", stopMoveHold);
-  window.addEventListener("pointercancel", stopMoveHold);
+  window.addEventListener("pointerup", () => stopMoveHold(sendMoveStop));
+  window.addEventListener("pointercancel", () => stopMoveHold(sendMoveStop));
 }
 
 function init() {

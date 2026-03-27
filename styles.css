@@ -724,6 +724,14 @@ button {
   animation-name: idle-bob-flipped;
 }
 
+.battle-fighter.is-running .runner-avatar {
+  animation: run-bob 0.44s ease-in-out infinite;
+}
+
+.battle-fighter.face-left.is-running .runner-avatar {
+  animation-name: run-bob-flipped;
+}
+
 .battle-fighter.is-compact .runner-avatar {
   width: 44px;
   height: 44px;
@@ -879,6 +887,30 @@ button {
   }
   50% {
     transform: scaleX(-1) translateY(-3px);
+  }
+}
+
+@keyframes run-bob {
+  0%, 100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  35% {
+    transform: translateY(-4px) scale(1.04, 0.96);
+  }
+  60% {
+    transform: translateY(1px) scale(0.97, 1.04);
+  }
+}
+
+@keyframes run-bob-flipped {
+  0%, 100% {
+    transform: scaleX(-1) translateY(0) scale(1, 1);
+  }
+  35% {
+    transform: scaleX(-1) translateY(-4px) scale(1.04, 0.96);
+  }
+  60% {
+    transform: scaleX(-1) translateY(1px) scale(0.97, 1.04);
   }
 }
 
