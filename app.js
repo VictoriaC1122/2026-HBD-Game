@@ -109,22 +109,39 @@ const el = {
 };
 
 function iconMarkup(icon, accent) {
-  const paths = {
-    fox: `<path d="M10 24h8v8h-8zM18 16h8v8h-8zM38 16h8v8h-8zM46 24h8v8h-8zM18 24h28v24H18zM22 36h4v4h-4zM38 36h4v4h-4zM28 44h8v4h-8z" fill="${accent}"/><path d="M22 28h20v12H22z" fill="#fff4df"/>`,
-    bunny: `<path d="M20 6h8v18h-8zM36 6h8v18h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffaf2"/><path d="M24 34h4v4h-4zM36 34h4v4h-4zM30 42h4v4h-4z" fill="#2d2d2d"/>`,
-    cat: `<path d="M16 18h8v8h-8zM24 10h8v8h-8zM32 10h8v8h-8zM40 18h8v8h-8zM16 26h32v24H16z" fill="${accent}"/><path d="M20 30h24v16H20z" fill="#fff4fb"/>`,
-    bear: `<path d="M14 18h8v8h-8zM42 18h8v8h-8zM16 22h32v28H16z" fill="${accent}"/><path d="M20 26h24v20H20z" fill="#fffefc"/>`,
-    hero: `<path d="M22 8h20v10H22zM18 18h28v12H18zM16 30h12v18H16zM36 30h12v18H36zM28 30h8v18h-8z" fill="${accent}"/><path d="M22 18h20v14H22z" fill="#fff4de"/>`,
-    dino: `<path d="M16 18h20v8H16zM36 22h12v20H36zM20 26h20v20H20zM16 38h8v10h-8z" fill="${accent}"/><path d="M24 26h12v16H24z" fill="#f5ffed"/>`,
-    whale: `<path d="M12 22h36v20H12zM48 26h6v12h-6zM20 18h18v6H20z" fill="${accent}"/><path d="M20 26h20v12H20z" fill="#def8ff"/>`,
-    pup: `<path d="M16 18h10v8H16zM38 18h10v8H38zM18 24h28v24H18z" fill="${accent}"/><path d="M22 28h20v18H22z" fill="#fff7f0"/>`,
-    mage: `<path d="M20 8h24v8H20zM16 16h32v10H16zM20 26h24v22H20z" fill="${accent}"/><path d="M24 20h16v20H24z" fill="#fff8ff"/>`,
-    chick: `<path d="M18 16h28v8H18zM16 24h32v22H16z" fill="${accent}"/><path d="M20 28h24v16H20z" fill="#ffe9cc"/>`,
-    star: `<path d="M28 10h8v8h8v8h8v8h-8v8h-8v8h-8v-8h-8v-8h-8v-8h8v-8h8z" fill="${accent}"/>`,
-    robot: `<path d="M20 10h24v6H20zM18 18h28v24H18zM14 24h4v10h-4zM46 24h4v10h-4zM22 42h8v8h-8zM34 42h8v8h-8z" fill="${accent}"/><path d="M22 22h20v16H22z" fill="#edfdfd"/>`
+  const costumes = {
+    hero: { hair: "#8b3f25", body: accent, trim: "#f6d365", gear: "#4f6ed8", aura: "#ffd77c" },
+    bunny: { hair: "#f5f1ff", body: accent, trim: "#ff9fc2", gear: "#ffffff", aura: "#ffcfe3" },
+    fox: { hair: accent, body: "#f7efe7", trim: "#ffd46b", gear: "#5a3424", aura: "#ffc37f" },
+    cat: { hair: accent, body: "#fff1fb", trim: "#87a9ff", gear: "#4a3d78", aura: "#d6ddff" },
+    dino: { hair: "#8fd26d", body: accent, trim: "#f8f5c2", gear: "#4d7a2d", aura: "#c8f3ac" },
+    whale: { hair: "#72ddf7", body: "#effcff", trim: accent, gear: "#2c6f8a", aura: "#a9f0ff" },
+    pup: { hair: accent, body: "#fff1e2", trim: "#f6c995", gear: "#6f4a2f", aura: "#f4d1b2" },
+    mage: { hair: "#efe0ff", body: accent, trim: "#ffda7d", gear: "#52388c", aura: "#d9b8ff" },
+    chick: { hair: "#ffe97d", body: "#fff6d1", trim: accent, gear: "#cc824f", aura: "#ffe0a0" },
+    bear: { hair: accent, body: "#fff8ef", trim: "#8bc86a", gear: "#6b4b2d", aura: "#d8f2b4" },
+    star: { hair: "#fff8cf", body: "#fff0c5", trim: accent, gear: "#ff944d", aura: "#fff0a7" },
+    robot: { hair: "#c3f6ff", body: "#f4feff", trim: accent, gear: "#516c7d", aura: "#acefff" }
   };
 
-  return paths[icon];
+  const costume = costumes[icon] || costumes.hero;
+  return `
+    <ellipse cx="32" cy="57" rx="13" ry="4" fill="rgba(17,24,39,0.22)"/>
+    <path d="M20 47h24v7H20z" fill="${costume.gear}"/>
+    <path d="M23 35h18v15H23z" fill="${costume.body}"/>
+    <path d="M25 37h14v6H25z" fill="${costume.trim}" opacity="0.85"/>
+    <path d="M24 50h5v9h-5zM35 50h5v9h-5z" fill="${costume.gear}"/>
+    <path d="M18 37h5v11h-5zM41 37h5v11h-5z" fill="${costume.body}"/>
+    <circle cx="32" cy="24" r="11" fill="#ffe6cf"/>
+    <path d="M22 22c2-7 7-11 15-11 5 0 8 2 11 6l-2 9H22z" fill="${costume.hair}"/>
+    <path d="M22 22c2-3 5-5 10-5 6 0 10 2 14 7v4H22z" fill="${costume.hair}" opacity="0.92"/>
+    <path d="M27 28h3v3h-3zM35 28h3v3h-3z" fill="#2d2d2d"/>
+    <path d="M29 33h6v2h-6z" fill="#c76f6f"/>
+    <path d="M24 15h4v5h-4zM36 15h4v5h-4z" fill="${costume.trim}"/>
+    <path d="M20 17h6v4h-6zM38 17h6v4h-6z" fill="${costume.trim}" opacity="0.85"/>
+    <circle cx="47" cy="19" r="4" fill="${costume.aura}" opacity="0.92"/>
+    <path d="M44 18h6v2h-6zM46 16h2v6h-2z" fill="#fff"/>
+  `;
 }
 
 function avatarSvg(avatar) {
@@ -136,8 +153,15 @@ function avatarSvg(avatar) {
           <stop offset="0%" stop-color="${primary}" />
           <stop offset="100%" stop-color="${secondary}" />
         </linearGradient>
+        <linearGradient id="panel-${avatar.id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.92)" />
+          <stop offset="100%" stop-color="rgba(255,255,255,0.14)" />
+        </linearGradient>
       </defs>
-      <rect x="2" y="2" width="60" height="60" fill="url(#bg-${avatar.id})" />
+      <rect x="2" y="2" width="60" height="60" rx="10" fill="url(#bg-${avatar.id})" />
+      <rect x="6" y="6" width="52" height="52" rx="8" fill="url(#panel-${avatar.id})" opacity="0.55" />
+      <circle cx="16" cy="14" r="8" fill="rgba(255,255,255,0.22)" />
+      <path d="M10 50c8-5 16-7 22-7 9 0 16 2 22 7v8H10z" fill="rgba(27,34,55,0.1)"/>
       ${iconMarkup(avatar.icon, accent)}
     </svg>
   `;
