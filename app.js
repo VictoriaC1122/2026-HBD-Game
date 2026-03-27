@@ -45,7 +45,9 @@ const appState = {
   gamePhase: "lobby",
   countdownValue: "",
   countdownTimer: null,
-  audioContext: null
+  audioContext: null,
+  joinRequested: false,
+  lastLocalHopAt: 0
 };
 
 const el = {
@@ -643,6 +645,7 @@ function startPlayerMode(hostId) {
       if (!message || typeof message !== "object") return;
 
       if (message.type === "joined") {
+        appState.joinRequested = false;
         appState.localPlayer = message.player;
         appState.localPlayerSnapshot = message.players;
         appState.gamePhase = message.gamePhase || "lobby";
@@ -668,8 +671,10 @@ function startPlayerMode(hostId) {
     });
 
     connection.on("close", () => {
+      appState.joinRequested = false;
       status("與房主的連線中斷了，請重新掃碼加入。");
       el.boostButton.disabled = true;
+      el.joinButton.disabled = true;
     });
   });
 
@@ -706,9 +711,12 @@ function wireEvents() {
 
   el.joinButton.disabled = true;
   el.joinButton.addEventListener("click", () => {
+    if (appState.joinRequested || !appState.hostConnection?.open) return;
     const name = el.playerName.value.trim() || "Player";
     const avatar = getAvatarById(appState.selectedAvatarId);
     getAudioContext();
+    appState.joinRequested = true;
+    el.joinButton.disabled = true;
     appState.hostConnection.send({
       type: "join",
       player: {
@@ -723,12 +731,14 @@ function wireEvents() {
   const hop = () => {
     getAudioContext();
     if (!appState.hostConnection?.open || !appState.localPlayer || el.boostButton.disabled) return;
+    const now = Date.now();
+    if (now - appState.lastLocalHopAt < HOP_COOLDOWN) return;
+    appState.lastLocalHopAt = now;
     appState.hostConnection.send({ type: "hop", playerId: appState.playerId });
     playTone(520, 0.04, "square", 0.03);
   };
 
   el.boostButton.addEventListener("pointerdown", hop);
-  el.boostButton.addEventListener("click", hop);
 }
 
 function init() {
