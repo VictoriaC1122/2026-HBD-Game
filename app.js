@@ -75,6 +75,7 @@ const el = {
   hudMode: document.querySelector("#hudMode"),
   hostLeader: document.querySelector("#hostLeader"),
   hostPhase: document.querySelector("#hostPhase"),
+  hostNextStep: document.querySelector("#hostNextStep"),
   track: document.querySelector("#track"),
   podium: document.querySelector("#podium"),
   raceSummary: document.querySelector("#raceSummary"),
@@ -91,6 +92,8 @@ const el = {
   joinPanel: document.querySelector("#joinPanel"),
   controllerPanel: document.querySelector("#controllerPanel"),
   playerGreeting: document.querySelector("#playerGreeting"),
+  playerConnectionChip: document.querySelector("#playerConnectionChip"),
+  playerHelperText: document.querySelector("#playerHelperText"),
   playerStatusChip: document.querySelector("#playerStatusChip"),
   playerActionChip: document.querySelector("#playerActionChip"),
   playerLanePreview: document.querySelector("#playerLanePreview"),
@@ -249,6 +252,63 @@ function getPhaseLabel() {
   if (appState.gamePhase === "battle") return "BATTLE";
   if (appState.gamePhase === "finished") return "FINISH";
   return "LOBBY";
+}
+
+function hostNextStepText(playerCount, aliveCount) {
+  if (!playerCount) return "先讓玩家掃碼加入，畫面會自動顯示目前人數。";
+  if (playerCount < 2) return "還差 1 位玩家，至少 2 人才能開始亂鬥。";
+  if (appState.gamePhase === "countdown") return "倒數進行中，大家現在可以把手機拿好準備開打。";
+  if (appState.gamePhase === "battle") return `亂鬥進行中，目前還有 ${aliveCount} 人存活。`;
+  if (appState.gamePhase === "finished") return "本局已結束，按下重設本局就能快速再玩一場。";
+  return "玩家都到齊了，按下開始亂鬥就會進入倒數。";
+}
+
+function updateHostUx(playerCount = appState.players.size, aliveCount = getAlivePlayers().length) {
+  if (!el.hostNextStep) return;
+  el.hostNextStep.innerHTML = `
+    <strong>下一步</strong>
+    <span>${hostNextStepText(playerCount, aliveCount)}</span>
+  `;
+}
+
+function updatePlayerUxMeta() {
+  if (!el.playerConnectionChip || !el.playerHelperText) return;
+
+  const connected = Boolean(appState.hostConnection?.open);
+  el.playerConnectionChip.textContent = connected ? "CONNECTED" : "RECONNECT";
+  el.playerConnectionChip.classList.toggle("is-offline", !connected);
+
+  if (!connected) {
+    el.playerHelperText.textContent = "和房主的連線中斷了，請重新掃碼加入。";
+    return;
+  }
+
+  if (appState.joinRequested) {
+    el.playerHelperText.textContent = "加入請求已送出，正在等房主同步你的角色。";
+    return;
+  }
+
+  if (!appState.localPlayer) {
+    el.playerHelperText.textContent = "輸入名字、選角色後按下加入戰場。";
+    return;
+  }
+
+  if (appState.gamePhase === "countdown") {
+    el.playerHelperText.textContent = `倒數 ${appState.countdownValue || ""} 中，手先放在左右和攻擊鍵上。`;
+    return;
+  }
+
+  if (appState.gamePhase === "battle") {
+    el.playerHelperText.textContent = "長按左右持續移動，跳躍閃招，靠近後按 ATTACK。";
+    return;
+  }
+
+  if (appState.gamePhase === "finished") {
+    el.playerHelperText.textContent = "本局結束，等房主重設就能立刻再開一場。";
+    return;
+  }
+
+  el.playerHelperText.textContent = "已加入成功，等房主按下開始亂鬥。";
 }
 
 function combatStatusText(player) {
@@ -532,6 +592,7 @@ function renderBattleArena(players) {
 
   const alivePlayers = sorted.filter(isAlive);
   el.hostLeader.textContent = alivePlayers[0]?.name || "全滅";
+  updateHostUx(sorted.length, alivePlayers.length);
 
   const damageMarkup = appState.damageBursts
     .map(
@@ -894,6 +955,8 @@ function updatePlayerStatus() {
     el.jumpButton.disabled = false;
     el.attackButton.disabled = false;
   }
+
+  updatePlayerUxMeta();
 }
 
 function optimisticMove(direction) {
@@ -964,6 +1027,7 @@ function applyRemoteState(message) {
   }
   renderCountdownOverlay();
   updatePlayerStatus();
+  updatePlayerUxMeta();
 }
 
 function registerConnection(connection) {
@@ -1031,6 +1095,7 @@ function startHostMode() {
     el.joinUrl.textContent = appState.joinUrl;
     status("戰場建立成功，讓大家掃 QR Code 加入。");
     renderBattleArena([]);
+    updateHostUx(0, 0);
     await renderQrCode(appState.joinUrl);
   });
 
@@ -1049,6 +1114,7 @@ function startPlayerMode(hostId) {
   el.playerView.classList.remove("hidden");
   setupAvatarPicker();
   status("輸入名字、選頭像後，就能加入戰場。");
+  updatePlayerUxMeta();
 
   const peer = new window.Peer();
   appState.peer = peer;
@@ -1060,6 +1126,7 @@ function startPlayerMode(hostId) {
     connection.on("open", () => {
       status("已連上房主，準備加入戰場。");
       el.joinButton.disabled = false;
+      updatePlayerUxMeta();
     });
 
     connection.on("data", (message) => {
@@ -1078,6 +1145,8 @@ function startPlayerMode(hostId) {
         renderPlayerPreview(message.player);
         appState.lastPhysicsAt = 0;
         updatePlayerStatus();
+        updatePlayerUxMeta();
+        el.joinButton.textContent = "加入戰場";
         status("加入成功，等待亂鬥開始。");
       }
 
@@ -1089,6 +1158,7 @@ function startPlayerMode(hostId) {
         appState.winnerId = message.winnerId;
         playVictoryFanfare();
         updatePlayerStatus();
+        updatePlayerUxMeta();
       }
     });
 
@@ -1100,6 +1170,8 @@ function startPlayerMode(hostId) {
       el.jumpButton.disabled = true;
       el.attackButton.disabled = true;
       el.joinButton.disabled = true;
+      el.joinButton.textContent = "重新加入";
+      updatePlayerUxMeta();
     });
   });
 
@@ -1142,6 +1214,7 @@ function wireEvents() {
     getAudioContext();
     appState.joinRequested = true;
     el.joinButton.disabled = true;
+    el.joinButton.textContent = "加入中...";
     appState.hostConnection.send({
       type: "join",
       player: {
@@ -1151,6 +1224,7 @@ function wireEvents() {
       }
     });
     status("正在送出加入請求...");
+    updatePlayerUxMeta();
   });
 
   const sendMove = (direction) => {
@@ -1207,6 +1281,8 @@ function init() {
   wireEvents();
   renderCountdownOverlay();
   startRenderLoop();
+  updateHostUx(0, 0);
+  updatePlayerUxMeta();
 
   const params = new URLSearchParams(window.location.search);
   const join = params.get("join");

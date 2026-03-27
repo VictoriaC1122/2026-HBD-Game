@@ -402,6 +402,36 @@ button {
   font-weight: 800;
 }
 
+.host-next-step,
+.player-live-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.host-next-step {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 3px solid var(--pixel-border);
+  background: linear-gradient(180deg, rgba(255, 250, 225, 0.96), rgba(255, 239, 190, 0.9));
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.1);
+  font-family: var(--ui-font);
+}
+
+.host-next-step strong {
+  color: var(--accent-dark);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.host-next-step span {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .primary-button,
 .secondary-button,
 .boost-button {
@@ -1125,6 +1155,42 @@ button {
   margin: 12px 0 8px;
 }
 
+.player-live-row {
+  justify-content: space-between;
+  margin: 10px 0 6px;
+}
+
+.player-connection-chip,
+.player-helper-text {
+  border: 3px solid var(--pixel-border);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+.player-connection-chip {
+  padding: 8px 12px;
+  color: #fff;
+  background: linear-gradient(180deg, #3aa96b, #1b7041);
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.player-connection-chip.is-offline {
+  background: linear-gradient(180deg, #9b5262, #6d2031);
+}
+
+.player-helper-text {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(241,245,255,0.86));
+  color: var(--muted);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .player-status-chip,
 .player-action-chip {
   padding: 8px 12px;
@@ -1241,7 +1307,9 @@ button {
   }
 
   .player-status-bar,
-  .controller-caption {
+  .controller-caption,
+  .player-live-row,
+  .host-next-step {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1249,6 +1317,13 @@ button {
   .player-status-chip,
   .player-action-chip {
     font-size: 14px;
+    text-align: center;
+  }
+
+  .player-helper-text,
+  .player-connection-chip,
+  .host-next-step span,
+  .host-next-step strong {
     text-align: center;
   }
 

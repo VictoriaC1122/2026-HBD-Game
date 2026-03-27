@@ -118,6 +118,10 @@
               <button id="startRaceButton" class="primary-button">開始亂鬥</button>
               <button id="resetRaceButton" class="secondary-button">重設本局</button>
             </div>
+            <div id="hostNextStep" class="host-next-step">
+              <strong>下一步</strong>
+              <span>等待至少 2 位玩家加入後開始。</span>
+            </div>
             <div class="quick-guide">
               <div class="guide-pill">LEFT / RIGHT</div>
               <div class="guide-pill">JUMP 跳躍</div>
@@ -195,6 +199,10 @@
           <div id="controllerPanel" class="hidden">
             <p class="section-label">你的控制器</p>
             <h2 id="playerGreeting">準備開始</h2>
+            <div class="player-live-row">
+              <div id="playerConnectionChip" class="player-connection-chip">CONNECTING</div>
+              <div id="playerHelperText" class="player-helper-text">正在準備控制器畫面...</div>
+            </div>
             <div class="player-status-bar">
               <div id="playerStatusChip" class="player-status-chip">WAITING</div>
               <div id="playerActionChip" class="player-action-chip">等待開打</div>
