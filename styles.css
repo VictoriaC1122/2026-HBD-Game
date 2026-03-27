@@ -680,6 +680,25 @@ button {
     radial-gradient(circle at 82% 28%, rgba(255,255,255,0.92) 0 32px, transparent 33px);
 }
 
+.battle-hills {
+  background:
+    radial-gradient(circle at 18% 88%, #8fd2a0 0 120px, transparent 121px),
+    radial-gradient(circle at 42% 84%, #77bf8a 0 150px, transparent 151px),
+    radial-gradient(circle at 76% 86%, #94d6b0 0 132px, transparent 133px);
+  opacity: 0.78;
+}
+
+.battle-village {
+  background:
+    linear-gradient(#e7c89c 0 0) 15% 61% / 72px 46px no-repeat,
+    linear-gradient(#8a4f36 0 0) 14% 57% / 80px 18px no-repeat,
+    linear-gradient(#f4dfc2 0 0) 48% 58% / 86px 54px no-repeat,
+    linear-gradient(#87513b 0 0) 47% 53% / 94px 22px no-repeat,
+    linear-gradient(#e2c396 0 0) 78% 60% / 68px 42px no-repeat,
+    linear-gradient(#7f4b35 0 0) 77% 56% / 76px 18px no-repeat;
+  opacity: 0.72;
+}
+
 .battle-crystals {
   background:
     linear-gradient(#e3fbff 0 0) 21% 56% / 32px 64px no-repeat,
@@ -700,6 +719,117 @@ button {
     linear-gradient(#5b8c44 0 0) 71% 75% / 18px 22% no-repeat,
     radial-gradient(circle at 90% 72%, #b6ffae 0 50px, transparent 51px),
     linear-gradient(#5b8c44 0 0) 90% 76% / 18px 20% no-repeat;
+}
+
+.battle-foreground {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.hide-spot,
+.foreground-mushroom,
+.foreground-lamp {
+  position: absolute;
+  bottom: 110px;
+}
+
+.hide-spot {
+  height: 70px;
+  border-radius: 80px 80px 16px 16px;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(214,255,201,0.9) 0 16%, transparent 17%),
+    linear-gradient(180deg, #93eb8b 0 28%, #4f9f54 28% 100%);
+  border: 3px solid rgba(24, 30, 28, 0.78);
+  box-shadow: inset 0 -10px 0 rgba(37, 77, 32, 0.2);
+}
+
+.hide-spot.left-grove {
+  left: 10%;
+  width: 124px;
+}
+
+.hide-spot.center-stump {
+  left: 45%;
+  width: 116px;
+  height: 64px;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(255,239,200,0.72) 0 15%, transparent 16%),
+    linear-gradient(180deg, #c68e59 0 24%, #805130 24% 100%);
+}
+
+.hide-spot.right-shrub {
+  right: 8%;
+  width: 130px;
+}
+
+.foreground-mushroom {
+  width: 44px;
+  height: 56px;
+}
+
+.foreground-mushroom::before,
+.foreground-mushroom::after {
+  content: "";
+  position: absolute;
+}
+
+.foreground-mushroom::before {
+  left: 5px;
+  right: 5px;
+  top: 0;
+  height: 24px;
+  border-radius: 24px 24px 10px 10px;
+  background: linear-gradient(180deg, #ff8ca0, #d94e68);
+  border: 3px solid rgba(24, 30, 28, 0.78);
+}
+
+.foreground-mushroom::after {
+  left: 16px;
+  top: 24px;
+  width: 12px;
+  height: 28px;
+  background: #fff4de;
+  border: 3px solid rgba(24, 30, 28, 0.78);
+  border-top: none;
+}
+
+.mush-a {
+  left: 30%;
+}
+
+.mush-b {
+  right: 28%;
+}
+
+.foreground-lamp {
+  width: 24px;
+  height: 86px;
+  background: linear-gradient(180deg, #735445, #4a322a);
+  border: 3px solid rgba(24, 30, 28, 0.78);
+  border-bottom: none;
+}
+
+.foreground-lamp::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: -14px;
+  width: 38px;
+  height: 26px;
+  border-radius: 16px;
+  background: radial-gradient(circle, #fff4c1 0 18%, #ffbe6b 18% 54%, #87513b 55% 100%);
+  border: 3px solid rgba(24, 30, 28, 0.78);
+  box-shadow: 0 0 18px rgba(255, 209, 131, 0.45);
+}
+
+.lamp-a {
+  left: 24%;
+}
+
+.lamp-b {
+  right: 22%;
 }
 
 .battle-platform {
@@ -873,6 +1003,16 @@ button {
 .battle-fighter.is-dead {
   opacity: 0.35;
   filter: grayscale(1);
+}
+
+.battle-fighter.is-hidden-cover {
+  filter: saturate(0.9) brightness(0.95);
+}
+
+.battle-fighter.is-hidden-cover .runner-avatar,
+.battle-fighter.is-hidden-cover .fighter-name,
+.battle-fighter.is-hidden-cover .fighter-meta {
+  opacity: 0.72;
 }
 
 .battle-fighter .runner-avatar {

@@ -15,6 +15,11 @@ const JUMP_COOLDOWN = 680;
 const JUMP_AIR_TIME = 700;
 const HIT_STUN = 360;
 const COUNTDOWN_STEPS = ["3", "2", "1", "FIGHT!"];
+const HIDE_ZONES = [
+  { id: "left-grove", min: 13, max: 24 },
+  { id: "center-stump", min: 46, max: 56 },
+  { id: "right-shrub", min: 74, max: 85 }
+];
 
 const avatarDefinitions = [
   { id: "rose", name: "Crimson Warrior", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
@@ -434,6 +439,7 @@ function combatStatusText(player) {
   if ((player.attackingUntil || 0) > Date.now()) return "SLASH";
   if ((player.hitUntil || 0) > Date.now()) return "HIT";
   if ((player.airborneUntil || 0) > Date.now()) return "JUMP";
+  if (isInHideZone(player)) return "HIDE";
   return "READY";
 }
 
@@ -477,6 +483,8 @@ function arenaDecorations() {
     <div class="battle-backdrop">
       <div class="battle-layer battle-sky"></div>
       <div class="battle-layer battle-clouds"></div>
+      <div class="battle-layer battle-hills"></div>
+      <div class="battle-layer battle-village"></div>
       <div class="battle-layer battle-crystals"></div>
       <div class="battle-layer battle-trees"></div>
       <div class="battle-platform ground"></div>
@@ -490,8 +498,37 @@ function arenaDecorations() {
   `;
 }
 
+function arenaForegroundDecorations() {
+  return `
+    <div class="battle-foreground">
+      <div class="hide-spot left-grove"></div>
+      <div class="hide-spot center-stump"></div>
+      <div class="hide-spot right-shrub"></div>
+      <div class="foreground-mushroom mush-a"></div>
+      <div class="foreground-mushroom mush-b"></div>
+      <div class="foreground-lamp lamp-a"></div>
+      <div class="foreground-lamp lamp-b"></div>
+    </div>
+  `;
+}
+
 function clampX(x) {
   return Math.max(6, Math.min(94, x));
+}
+
+function getHideZoneForX(x) {
+  return HIDE_ZONES.find((zone) => x >= zone.min && x <= zone.max) || null;
+}
+
+function isInHideZone(player, now = Date.now()) {
+  if (!player || player.dead || isAirborne(player, now)) return false;
+  return Boolean(getHideZoneForX(player.x));
+}
+
+function sameHideZone(attacker, target) {
+  const attackerZone = getHideZoneForX(attacker.x);
+  const targetZone = getHideZoneForX(target.x);
+  return attackerZone && targetZone && attackerZone.id === targetZone.id;
 }
 
 function movementIntent(direction) {
@@ -749,6 +786,7 @@ function renderBattleArena(players) {
       const fighterClass = [
         "battle-fighter",
         crowdedMode ? "is-compact" : "",
+        isInHideZone(player) ? "is-hidden-cover" : "",
         Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
         player.dead ? "is-dead" : "",
         isAirborne(player) ? "is-jumping" : "",
@@ -785,6 +823,7 @@ function renderBattleArena(players) {
         <div class="battle-chip">${alivePlayers.length} ALIVE</div>
       </div>
       ${fighterMarkup}
+      ${arenaForegroundDecorations()}
       ${damageMarkup}
       ${appState.gamePhase === "finished" && appState.winnerId ? renderWinnerShowcase() : ""}
     </div>
@@ -836,6 +875,7 @@ function renderPlayerPreview(player = appState.localPlayer) {
         <div class="runner-avatar">${avatarSvg(avatar)}</div>
         <div class="fighter-status">${combatStatusText(player)}</div>
       </div>
+      ${arenaForegroundDecorations()}
     </div>
   `;
 }
@@ -988,6 +1028,7 @@ function applyAttack(playerId) {
   appState.players.forEach((target) => {
     if (target.id === attacker.id || target.dead) return;
     if (isAirborne(target, now) && !isAirborne(attacker, now)) return;
+    if (isInHideZone(target, now) && !sameHideZone(attacker, target)) return;
     const directionCheck = attacker.direction === "right" ? target.x >= attacker.x : target.x <= attacker.x;
     if (!directionCheck) return;
     if (Math.abs(target.x - attacker.x) > ATTACK_RANGE) return;
