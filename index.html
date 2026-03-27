@@ -103,6 +103,17 @@
               </div>
             </div>
 
+            <div class="host-status-grid">
+              <div class="host-mini-card">
+                <span class="host-mini-label">目前領先</span>
+                <strong id="hostLeader">等待中</strong>
+              </div>
+              <div class="host-mini-card">
+                <span class="host-mini-label">目前狀態</span>
+                <strong id="hostPhase">LOBBY</strong>
+              </div>
+            </div>
+
             <div class="controls-row">
               <button id="startRaceButton" class="primary-button">開始比賽</button>
               <button id="resetRaceButton" class="secondary-button">重設本局</button>
@@ -184,6 +195,10 @@
           <div id="controllerPanel" class="hidden">
             <p class="section-label">你的控制器</p>
             <h2 id="playerGreeting">準備開始</h2>
+            <div class="player-status-bar">
+              <div id="playerStatusChip" class="player-status-chip">WAITING</div>
+              <div id="playerActionChip" class="player-action-chip">等待開始</div>
+            </div>
             <div class="controller-caption">
               <span>左邊衝刺</span>
               <span>右邊跳躍</span>

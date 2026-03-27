@@ -71,6 +71,8 @@ const el = {
   playerCount: document.querySelector("#playerCount"),
   hudPlayers: document.querySelector("#hudPlayers"),
   hudMode: document.querySelector("#hudMode"),
+  hostLeader: document.querySelector("#hostLeader"),
+  hostPhase: document.querySelector("#hostPhase"),
   track: document.querySelector("#track"),
   podium: document.querySelector("#podium"),
   raceSummary: document.querySelector("#raceSummary"),
@@ -87,6 +89,8 @@ const el = {
   joinPanel: document.querySelector("#joinPanel"),
   controllerPanel: document.querySelector("#controllerPanel"),
   playerGreeting: document.querySelector("#playerGreeting"),
+  playerStatusChip: document.querySelector("#playerStatusChip"),
+  playerActionChip: document.querySelector("#playerActionChip"),
   playerLanePreview: document.querySelector("#playerLanePreview"),
   boostButton: document.querySelector("#boostButton"),
   jumpButton: document.querySelector("#jumpButton"),
@@ -366,6 +370,8 @@ function renderHostTrack() {
   el.playerCount.textContent = String(players.length);
   el.hudPlayers.textContent = String(players.length);
   el.hudMode.textContent = getPhaseLabel();
+  el.hostPhase.textContent = getPhaseLabel();
+  el.hostLeader.textContent = players[0]?.name || "等待中";
 
   if (!players.length) {
     el.track.innerHTML = `
@@ -382,6 +388,7 @@ function renderHostTrack() {
     el.podium.innerHTML = "";
     el.raceSummary.textContent = "等待玩家加入...";
     el.startRaceButton.disabled = true;
+    el.hostLeader.textContent = "等待中";
     renderCountdownOverlay();
     return;
   }
@@ -735,23 +742,33 @@ function updatePlayerStatus() {
     el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備好 RUN 和 JUMP。`;
     el.boostButton.disabled = true;
     el.jumpButton.disabled = true;
+    el.playerStatusChip.textContent = "COUNTDOWN";
+    el.playerActionChip.textContent = `準備 ${appState.countdownValue || ""}`;
   } else if (appState.gamePhase === "lobby") {
     el.controllerHint.textContent = "等待房主開始比賽。開跑後用 RUN 衝刺，用 JUMP 跳過障礙。";
     el.boostButton.disabled = true;
     el.jumpButton.disabled = true;
+    el.playerStatusChip.textContent = "WAITING";
+    el.playerActionChip.textContent = "等待開跑";
   } else if (winner) {
     el.controllerHint.textContent = "你是冠軍！等房主重設後可以再玩一局。";
     el.boostButton.disabled = true;
     el.jumpButton.disabled = true;
+    el.playerStatusChip.textContent = "WINNER";
+    el.playerActionChip.textContent = "你第一名";
   } else if (appState.winnerId) {
     const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
     el.controllerHint.textContent = `${winnerName || "有人"} 已經先到終點城堡，等房主重設下一局。`;
     el.boostButton.disabled = true;
     el.jumpButton.disabled = true;
+    el.playerStatusChip.textContent = "FINISHED";
+    el.playerActionChip.textContent = `${winnerName || "有人"} 已到終點`;
   } else {
     el.controllerHint.textContent = "RUN 衝刺前進，JUMP 跳過木箱與尖刺，踩上彈簧會飛得更遠。";
     el.boostButton.disabled = false;
     el.jumpButton.disabled = false;
+    el.playerStatusChip.textContent = "RACING";
+    el.playerActionChip.textContent = isAirborne(appState.localPlayer) ? "空中跳躍中" : "全力前進";
   }
 }
 
