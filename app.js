@@ -788,12 +788,17 @@ function stopMoveHold() {
   }
 }
 
-function startMoveHold(direction, sendMove) {
-  appState.activeMoveDirection = direction;
-  sendMove(direction);
+function startMoveHold(event, direction, sendMove) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  event.preventDefault();
   stopMoveHold();
   appState.activeMoveDirection = direction;
+  if (event.currentTarget?.setPointerCapture) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  sendMove(direction);
   appState.localMoveTimer = window.setInterval(() => {
+    if (appState.activeMoveDirection !== direction) return;
     sendMove(direction);
   }, MOVE_COOLDOWN);
 }
@@ -995,7 +1000,8 @@ function wireEvents() {
   });
 
   const sendMove = (direction) => {
-    if (!appState.hostConnection?.open || !appState.localPlayer || el.leftButton.disabled) return;
+    if (!appState.hostConnection?.open || !appState.localPlayer) return;
+    if (el.leftButton.disabled || el.rightButton.disabled || appState.gamePhase !== "battle") return;
     const now = Date.now();
     if (now - appState.lastLocalMoveAt < MOVE_COOLDOWN) return;
     appState.lastLocalMoveAt = now;
@@ -1024,8 +1030,17 @@ function wireEvents() {
     playTone(340, 0.07, "sawtooth", 0.05);
   };
 
-  el.leftButton.addEventListener("pointerdown", () => startMoveHold("left", sendMove));
-  el.rightButton.addEventListener("pointerdown", () => startMoveHold("right", sendMove));
+  const bindMoveButton = (button, direction) => {
+    button.addEventListener("pointerdown", (event) => startMoveHold(event, direction, sendMove));
+    button.addEventListener("pointerup", stopMoveHold);
+    button.addEventListener("pointercancel", stopMoveHold);
+    button.addEventListener("pointerleave", stopMoveHold);
+    button.addEventListener("lostpointercapture", stopMoveHold);
+    button.addEventListener("contextmenu", (event) => event.preventDefault());
+  };
+
+  bindMoveButton(el.leftButton, "left");
+  bindMoveButton(el.rightButton, "right");
   el.jumpButton.addEventListener("pointerdown", sendJump);
   el.attackButton.addEventListener("pointerdown", sendAttack);
   window.addEventListener("pointerup", stopMoveHold);

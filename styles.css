@@ -691,10 +691,6 @@ button {
   width: 68px;
 }
 
-.battle-fighter.face-left {
-  transform: translateX(-50%) scaleX(-1);
-}
-
 .battle-fighter.is-jumping {
   bottom: 146px !important;
 }
@@ -723,10 +719,19 @@ button {
   animation: idle-bob 1.35s ease-in-out infinite;
 }
 
+.battle-fighter.face-left .runner-avatar {
+  transform: scaleX(-1);
+  animation-name: idle-bob-flipped;
+}
+
 .battle-fighter.is-compact .runner-avatar {
   width: 44px;
   height: 44px;
   border-width: 2px;
+}
+
+.battle-fighter.face-left.is-compact .runner-avatar {
+  transform: scaleX(-1);
 }
 
 .fighter-hp-bar {
@@ -865,6 +870,15 @@ button {
   }
   50% {
     transform: translateY(-3px);
+  }
+}
+
+@keyframes idle-bob-flipped {
+  0%, 100% {
+    transform: scaleX(-1) translateY(0);
+  }
+  50% {
+    transform: scaleX(-1) translateY(-3px);
   }
 }
 
