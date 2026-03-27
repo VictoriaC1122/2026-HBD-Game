@@ -27,12 +27,31 @@
 
     <main class="app-shell">
       <section class="hero-card">
-        <div class="hero-copy">
-          <p class="eyebrow">Pixel Party Race</p>
-          <h1>Birthday Dash Deluxe</h1>
-          <p class="hero-text">
-            像你照片裡那種復古電玩競速感，但做成原創像素派對版本。大家掃碼加入後，用手機狂按衝刺鍵，在大螢幕像素地圖上比誰先跑到終點城堡。
-          </p>
+        <div class="hero-layout">
+          <div class="hero-copy">
+            <p class="eyebrow">Pixel Party Race</p>
+            <h1>Birthday Dash Deluxe</h1>
+            <p class="hero-text">
+              原創像素派對競速遊戲。主持人開房後，大家掃碼加入、選角色、在同一張奇幻地圖裡跑跳競速，看誰最先衝進終點傳送門。
+            </p>
+          </div>
+          <div class="hero-steps">
+            <div class="mini-step">
+              <span>1</span>
+              <strong>開房掃碼</strong>
+              <p>房主顯示 QR Code，大家用手機加入。</p>
+            </div>
+            <div class="mini-step">
+              <span>2</span>
+              <strong>選角準備</strong>
+              <p>輸入名字、挑頭像、等待倒數開始。</p>
+            </div>
+            <div class="mini-step">
+              <span>3</span>
+              <strong>跑跳競速</strong>
+              <p>用 `RUN` 前進、`JUMP` 躲障礙，衝向終點。</p>
+            </div>
+          </div>
         </div>
         <div class="hero-pill-row">
           <span class="hero-pill">橫向卷軸視覺</span>
@@ -80,13 +99,19 @@
             <div class="card-header">
               <div>
                 <p class="section-label">比賽控制</p>
-                <h2>開跑與重開一局</h2>
+                <h2>房主操作台</h2>
               </div>
             </div>
 
             <div class="controls-row">
               <button id="startRaceButton" class="primary-button">開始比賽</button>
               <button id="resetRaceButton" class="secondary-button">重設本局</button>
+            </div>
+            <div class="quick-guide">
+              <div class="guide-pill">`RUN` 前進</div>
+              <div class="guide-pill">`JUMP` 跳躍</div>
+              <div class="guide-pill">星星加速</div>
+              <div class="guide-pill">障礙要躲</div>
             </div>
             <p class="hint-text">
               開始後會先倒數 3、2、1，再正式開跑。踩到星星磚塊會爆衝，踩到泥巴洞會被拖慢。
@@ -159,6 +184,10 @@
           <div id="controllerPanel" class="hidden">
             <p class="section-label">你的控制器</p>
             <h2 id="playerGreeting">準備開始</h2>
+            <div class="controller-caption">
+              <span>左邊衝刺</span>
+              <span>右邊跳躍</span>
+            </div>
             <div class="player-lane-card">
               <div id="playerLanePreview" class="player-lane-preview"></div>
             </div>

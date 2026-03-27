@@ -130,6 +130,13 @@ button {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 243, 219, 0.9));
 }
 
+.hero-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+  gap: 24px;
+  align-items: start;
+}
+
 .hero-copy h1,
 .card h2,
 .countdown-number,
@@ -179,6 +186,46 @@ button {
   gap: 12px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.hero-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.mini-step {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 3px solid var(--pixel-border);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.1);
+}
+
+.mini-step span {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 10px;
+  color: #fff;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+  border: 3px solid var(--pixel-border);
+  font-family: var(--display-font);
+  font-size: 20px;
+}
+
+.mini-step strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--ui-font);
+  font-size: 16px;
+}
+
+.mini-step p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  font-family: var(--ui-font);
+  font-size: 14px;
 }
 
 .hero-pill {
@@ -276,6 +323,23 @@ button {
   color: var(--muted);
   line-height: 1.8;
   font-family: var(--ui-font);
+}
+
+.quick-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.guide-pill {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 2px solid var(--pixel-border);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .primary-button,
@@ -1202,6 +1266,17 @@ button {
   margin: 0 auto;
 }
 
+.controller-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 10px;
+  color: var(--muted);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .input-label {
   display: block;
   margin-bottom: 8px;
@@ -1317,6 +1392,7 @@ button {
 }
 
 @media (max-width: 960px) {
+  .hero-layout,
   .host-grid,
   .room-layout {
     grid-template-columns: 1fr;
