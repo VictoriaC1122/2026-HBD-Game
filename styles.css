@@ -765,7 +765,8 @@ button {
 .hide-spot,
 .foreground-mushroom,
 .foreground-lamp,
-.sky-bush {
+.sky-bush,
+.spring-pad {
   position: absolute;
   bottom: 110px;
 }
@@ -888,6 +889,37 @@ button {
   bottom: 236px;
 }
 
+.spring-pad {
+  width: 58px;
+  height: 38px;
+  border-radius: 28px 28px 14px 14px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,0.82) 0 14%, transparent 15%),
+    linear-gradient(180deg, #ff8fb0 0 34%, #ff5c8a 34% 100%);
+  border: 3px solid rgba(24, 30, 28, 0.78);
+  box-shadow: inset 0 -8px 0 rgba(161, 39, 80, 0.28), 0 0 20px rgba(255, 145, 188, 0.28);
+}
+
+.spring-pad::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  bottom: -18px;
+  width: 22px;
+  height: 18px;
+  border: 4px solid rgba(24, 30, 28, 0.78);
+  border-top: none;
+  background: linear-gradient(180deg, #ffe16b, #ffb347);
+}
+
+.spring-pad.spring-left {
+  left: 26.5%;
+}
+
+.spring-pad.spring-right {
+  left: 71%;
+}
+
 .battle-platform {
   position: absolute;
   border: 3px solid rgba(24, 30, 28, 0.92);
@@ -936,6 +968,47 @@ button {
   bottom: 154px;
   width: 112px;
   height: 24px;
+}
+
+.battle-platform.float-move {
+  height: 24px;
+  background:
+    linear-gradient(180deg, #fffef2 0 24%, #cce6ff 24% 36%, #7dc0ff 36% 100%);
+  box-shadow:
+    inset 0 -10px 0 rgba(30, 71, 120, 0.18),
+    0 10px 0 rgba(19, 34, 14, 0.14),
+    0 0 18px rgba(159, 219, 255, 0.34);
+}
+
+.battle-pit {
+  position: absolute;
+  bottom: 0;
+  height: 112px;
+  border-top: 4px solid rgba(24, 30, 28, 0.92);
+  background:
+    linear-gradient(180deg, rgba(40, 52, 80, 0.08) 0 8%, rgba(18, 28, 46, 0.88) 8% 100%),
+    linear-gradient(90deg, rgba(126, 219, 255, 0.18), rgba(255, 147, 173, 0.2));
+  box-shadow: inset 0 16px 0 rgba(255,255,255,0.08);
+}
+
+.battle-pit::before {
+  content: "";
+  position: absolute;
+  inset: 10px 14px 18px;
+  background:
+    repeating-linear-gradient(90deg, rgba(127, 227, 255, 0.22) 0 10px, transparent 10px 18px),
+    linear-gradient(180deg, rgba(255, 155, 195, 0.14), transparent 60%);
+  opacity: 0.8;
+}
+
+.battle-pit.pit-left {
+  left: 24%;
+  width: 5%;
+}
+
+.battle-pit.pit-right {
+  left: 58%;
+  width: 6%;
 }
 
 .arena-totem,
@@ -1984,6 +2057,14 @@ button {
     bottom: 176px;
   }
 
+  .spring-pad.spring-left {
+    left: 27%;
+  }
+
+  .spring-pad.spring-right {
+    left: 70.5%;
+  }
+
   .arena-gate {
     width: 196px;
     height: 126px;
@@ -1996,6 +2077,14 @@ button {
 
   .sky-bush.perch-right {
     bottom: 266px;
+  }
+
+  .battle-pit.pit-left {
+    left: 24.2%;
+  }
+
+  .battle-pit.pit-right {
+    left: 58.4%;
   }
 }
 
@@ -2039,6 +2128,14 @@ button {
   .sky-bush.perch-right {
     right: 5%;
     bottom: 200px;
+  }
+
+  .spring-pad.spring-left {
+    left: 24.5%;
+  }
+
+  .spring-pad.spring-right {
+    left: 70%;
   }
 }
 
@@ -2089,6 +2186,11 @@ button {
 
   .sky-bush {
     transform: scale(0.82);
+    transform-origin: center bottom;
+  }
+
+  .spring-pad {
+    transform: scale(0.84);
     transform-origin: center bottom;
   }
 

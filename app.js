@@ -20,6 +20,14 @@ const HIDE_ZONES = [
   { id: "center-stump", min: 46, max: 56 },
   { id: "right-shrub", min: 74, max: 85 }
 ];
+const PIT_ZONES = [
+  { id: "pit-left", min: 24, max: 29, bounceX: 22.5 },
+  { id: "pit-right", min: 58, max: 64, bounceX: 66.5 }
+];
+const SPRING_ZONES = [
+  { id: "spring-left", min: 27, max: 33, launch: 980, boostX: 0.7 },
+  { id: "spring-right", min: 71, max: 77, launch: 1020, boostX: 0.8 }
+];
 const PLATFORM_ZONES = [
   { id: "float-a", min: 14, max: 28, bottom: 176, tier: 1, perch: "蘑菇跳台" },
   { id: "float-b", min: 68, max: 86, bottom: 214, tier: 2, perch: "高空樹台" },
@@ -446,6 +454,7 @@ function combatStatusText(player) {
   if ((player.attackingUntil || 0) > Date.now()) return "SLASH";
   if ((player.hitUntil || 0) > Date.now()) return "HIT";
   if ((player.airborneUntil || 0) > Date.now()) return "JUMP";
+  if (Date.now() - (player.lastSpringAt || 0) < 280) return "BOOST";
   if (getPerchLabel(player)) return "PERCH";
   if (isInHideZone(player)) return "HIDE";
   return "READY";
@@ -459,26 +468,53 @@ function isAlive(player) {
   return !player.dead && player.hp > 0;
 }
 
-function getPlatformZones() {
+function getMovingPlatformZone(now = Date.now()) {
+  const desktop = window.innerWidth >= 961;
+  const center = desktop ? 56 : 54;
+  const drift = Math.sin(now / 900) * (desktop ? 10 : 8);
+  const width = desktop ? 11 : 10;
+  const min = center + drift - width / 2;
+  const max = center + drift + width / 2;
+  return {
+    id: "float-move",
+    min,
+    max,
+    bottom: desktop ? 214 : 182,
+    tier: 2,
+    perch: "巡航浮台",
+    style: `left:${min}%; width:${max - min}%; bottom:${desktop ? 214 : 182}px;`
+  };
+}
+
+function getMovingPlatformOffset(now = Date.now(), deltaMs = 16.67) {
+  const current = getMovingPlatformZone(now);
+  const previous = getMovingPlatformZone(now - deltaMs);
+  const currentCenter = (current.min + current.max) / 2;
+  const previousCenter = (previous.min + previous.max) / 2;
+  return currentCenter - previousCenter;
+}
+
+function getPlatformZones(now = Date.now()) {
   if (window.innerWidth >= 961) {
     return [
       { id: "float-a", min: 14, max: 29, bottom: 194, tier: 1, perch: "蘑菇跳台" },
       { id: "float-b", min: 66, max: 86, bottom: 242, tier: 2, perch: "高空樹台" },
       { id: "float-c", min: 42, max: 56, bottom: 152, tier: 1, perch: "中央石橋" },
       { id: "float-d", min: 29, max: 41, bottom: 286, tier: 3, perch: "月台瞭望點" },
-      { id: "float-e", min: 82, max: 93, bottom: 176, tier: 1, perch: "右側枝台" }
+      { id: "float-e", min: 82, max: 93, bottom: 176, tier: 1, perch: "右側枝台" },
+      getMovingPlatformZone(now)
     ];
   }
-  return PLATFORM_ZONES;
+  return [...PLATFORM_ZONES, getMovingPlatformZone(now)];
 }
 
-function getPlatformZoneForX(x) {
-  return getPlatformZones().find((zone) => x >= zone.min && x <= zone.max) || null;
+function getPlatformZoneForX(x, now = Date.now()) {
+  return getPlatformZones(now).find((zone) => x >= zone.min && x <= zone.max) || null;
 }
 
 function getPlayerPlatformZone(player, now = Date.now()) {
   if (!player || player.dead) return null;
-  const zoneAtPosition = getPlatformZoneForX(player.x);
+  const zoneAtPosition = getPlatformZoneForX(player.x, now);
   if (isAirborne(player, now)) {
     if (zoneAtPosition) {
       player.platformZoneId = zoneAtPosition.id;
@@ -488,7 +524,7 @@ function getPlayerPlatformZone(player, now = Date.now()) {
   }
 
   if (player.platformZoneId) {
-    const lockedZone = getPlatformZones().find((zone) => zone.id === player.platformZoneId);
+    const lockedZone = getPlatformZones(now).find((zone) => zone.id === player.platformZoneId);
     if (lockedZone && player.x >= lockedZone.min && player.x <= lockedZone.max) {
       return lockedZone;
     }
@@ -530,6 +566,14 @@ function getPerchLabel(player, now = Date.now()) {
   return getPlayerPlatformZone(player, now)?.perch || "";
 }
 
+function getPitZoneForX(x) {
+  return PIT_ZONES.find((zone) => x >= zone.min && x <= zone.max) || null;
+}
+
+function getSpringZoneForX(x) {
+  return SPRING_ZONES.find((zone) => x >= zone.min && x <= zone.max) || null;
+}
+
 function setupAvatarPicker() {
   el.avatarPicker.innerHTML = avatarDefinitions
     .map((avatar) => {
@@ -554,6 +598,7 @@ function setupAvatarPicker() {
 }
 
 function arenaDecorations() {
+  const movingPlatform = getMovingPlatformZone();
   return `
     <div class="battle-backdrop">
       <div class="battle-layer battle-sky"></div>
@@ -571,6 +616,9 @@ function arenaDecorations() {
       <div class="battle-platform float-c"></div>
       <div class="battle-platform float-d"></div>
       <div class="battle-platform float-e"></div>
+      <div class="battle-platform float-move" style="${movingPlatform.style}"></div>
+      <div class="battle-pit pit-left"></div>
+      <div class="battle-pit pit-right"></div>
       <div class="arena-totem left"></div>
       <div class="arena-totem right"></div>
       <div class="arena-gate"></div>
@@ -588,6 +636,8 @@ function arenaForegroundDecorations() {
       <div class="foreground-mushroom mush-b"></div>
       <div class="foreground-lamp lamp-a"></div>
       <div class="foreground-lamp lamp-b"></div>
+      <div class="spring-pad spring-left"></div>
+      <div class="spring-pad spring-right"></div>
       <div class="sky-bush perch-left"></div>
       <div class="sky-bush perch-right"></div>
     </div>
@@ -657,6 +707,7 @@ function stepPlayerMotion(player, deltaScale, now = Date.now()) {
   const airborne = isAirborne(player, now);
   const stunned = now < (player.hitUntil || 0);
   const intent = stunned ? 0 : (player.moveIntent || 0);
+  const currentZone = getPlayerPlatformZone(player, now);
   const targetVelocity = intent * MAX_RUN_SPEED;
   const acceleration = (airborne ? AIR_ACCEL : GROUND_ACCEL) * deltaScale;
 
@@ -676,9 +727,51 @@ function stepPlayerMotion(player, deltaScale, now = Date.now()) {
     player.velocityX = 0;
   }
   player.x = nextX;
+  if (!airborne && currentZone?.id === "float-move") {
+    player.x = clampX(player.x + getMovingPlatformOffset(now, 16.67 * deltaScale));
+  }
   getPlayerPlatformZone(player, now);
 
   return Math.abs(player.x - previousX) > 0.01 || Math.abs((player.velocityX || 0) - previousVelocity) > 0.01 || previousDirection !== player.direction;
+}
+
+function applyArenaTriggers(player, now = Date.now()) {
+  if (!player || player.dead || appState.gamePhase !== "battle") return false;
+  const grounded = !isAirborne(player, now);
+  const tier = getPlayerTier(player, now);
+  let changed = false;
+
+  if (grounded && tier === 0) {
+    const pitZone = getPitZoneForX(player.x);
+    if (pitZone && now - (player.lastPitAt || 0) > 1200) {
+      player.lastPitAt = now;
+      player.platformZoneId = null;
+      player.hp = Math.max(0, player.hp - 18);
+      player.hitUntil = now + 260;
+      player.airborneUntil = now + 760;
+      player.x = clampX(pitZone.bounceX);
+      player.velocityX = player.x < 50 ? 1.4 : -1.4;
+      addDamageBurst(player.x, 18, false, player.avatarId);
+      changed = true;
+      if (player.hp <= 0) {
+        player.dead = true;
+        player.airborneUntil = 0;
+        player.attackingUntil = 0;
+        player.velocityX = 0;
+      }
+    }
+
+    const springZone = getSpringZoneForX(player.x);
+    if (!player.dead && springZone && now - (player.lastSpringAt || 0) > 900) {
+      player.lastSpringAt = now;
+      player.platformZoneId = null;
+      player.airborneUntil = now + springZone.launch;
+      player.velocityX = (player.velocityX || 0) + (player.direction === "right" ? springZone.boostX : -springZone.boostX);
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 function advanceArenaPhysics(now) {
@@ -696,6 +789,7 @@ function advanceArenaPhysics(now) {
   let changed = false;
   appState.players.forEach((player) => {
     changed = stepPlayerMotion(player, deltaScale, now) || changed;
+    changed = applyArenaTriggers(player, now) || changed;
   });
 
   if (!changed) return;
@@ -722,6 +816,9 @@ function advanceLocalPhysics(now) {
   if (stepPlayerMotion(appState.localPlayer, deltaScale, now)) {
     appState.needsRender = true;
   }
+  if (applyArenaTriggers(appState.localPlayer, now)) {
+    appState.needsRender = true;
+  }
 }
 
 function addDamageBurst(x, amount, crit = false, avatarId = "rose") {
@@ -746,6 +843,7 @@ function pruneDamageBursts() {
 
 function hasLiveEffects() {
   const now = Date.now();
+  if (appState.gamePhase === "battle") return true;
   if (appState.damageBursts.length) return true;
   for (const player of appState.players.values()) {
     if ((player.airborneUntil || 0) > now) return true;
@@ -1030,7 +1128,9 @@ function createPlayer(messagePlayer) {
     platformZoneId: null,
     velocityX: 0,
     lastJumpAt: 0,
-    lastAttackAt: 0
+    lastAttackAt: 0,
+    lastPitAt: 0,
+    lastSpringAt: 0
   };
 }
 
@@ -1055,6 +1155,8 @@ function resetBattle() {
     player.velocityX = 0;
     player.lastJumpAt = 0;
     player.lastAttackAt = 0;
+    player.lastPitAt = 0;
+    player.lastSpringAt = 0;
   });
   appState.lastPhysicsAt = 0;
   appState.lastStateSyncAt = 0;
@@ -1228,7 +1330,7 @@ function updatePlayerStatus() {
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else {
-    el.controllerHint.textContent = "左右移動搶平台，跳躍卡高點，按 ATTACK 從高台伏擊更有優勢。";
+    el.controllerHint.textContent = "左右移動搶平台，踩彈跳菇衝高點，小心掉落區，按 ATTACK 從高台伏擊更有優勢。";
     el.playerStatusChip.textContent = "BATTLE";
     el.playerActionChip.textContent = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
     el.leftButton.disabled = false;
