@@ -21,9 +21,11 @@ const HIDE_ZONES = [
   { id: "right-shrub", min: 74, max: 85 }
 ];
 const PLATFORM_ZONES = [
-  { id: "float-a", min: 15, max: 27, bottom: 176 },
-  { id: "float-b", min: 69, max: 85, bottom: 214 },
-  { id: "float-c", min: 43, max: 55, bottom: 134 }
+  { id: "float-a", min: 14, max: 28, bottom: 176, tier: 1, perch: "蘑菇跳台" },
+  { id: "float-b", min: 68, max: 86, bottom: 214, tier: 2, perch: "高空樹台" },
+  { id: "float-c", min: 42, max: 56, bottom: 134, tier: 1, perch: "中央石橋" },
+  { id: "float-d", min: 30, max: 40, bottom: 248, tier: 3, perch: "月台瞭望點" },
+  { id: "float-e", min: 82, max: 92, bottom: 154, tier: 1, perch: "右側枝台" }
 ];
 
 const avatarDefinitions = [
@@ -444,6 +446,7 @@ function combatStatusText(player) {
   if ((player.attackingUntil || 0) > Date.now()) return "SLASH";
   if ((player.hitUntil || 0) > Date.now()) return "HIT";
   if ((player.airborneUntil || 0) > Date.now()) return "JUMP";
+  if (getPerchLabel(player)) return "PERCH";
   if (isInHideZone(player)) return "HIDE";
   return "READY";
 }
@@ -459,9 +462,11 @@ function isAlive(player) {
 function getPlatformZones() {
   if (window.innerWidth >= 961) {
     return [
-      { id: "float-a", min: 14, max: 29, bottom: 194 },
-      { id: "float-b", min: 66, max: 86, bottom: 242 },
-      { id: "float-c", min: 42, max: 56, bottom: 152 }
+      { id: "float-a", min: 14, max: 29, bottom: 194, tier: 1, perch: "蘑菇跳台" },
+      { id: "float-b", min: 66, max: 86, bottom: 242, tier: 2, perch: "高空樹台" },
+      { id: "float-c", min: 42, max: 56, bottom: 152, tier: 1, perch: "中央石橋" },
+      { id: "float-d", min: 29, max: 41, bottom: 286, tier: 3, perch: "月台瞭望點" },
+      { id: "float-e", min: 82, max: 93, bottom: 176, tier: 1, perch: "右側枝台" }
     ];
   }
   return PLATFORM_ZONES;
@@ -510,6 +515,21 @@ function previewPlayerBottom(player, now = Date.now()) {
   return Math.round(playerBottom(player, 0, now) * 0.72);
 }
 
+function getPlayerTier(player, now = Date.now()) {
+  const zone = getPlayerPlatformZone(player, now);
+  return zone?.tier || 0;
+}
+
+function isSameCombatLayer(attacker, target, now = Date.now()) {
+  if (isAirborne(attacker, now) || isAirborne(target, now)) return true;
+  return Math.abs(playerBottom(attacker, 0, now) - playerBottom(target, 0, now)) <= 32;
+}
+
+function getPerchLabel(player, now = Date.now()) {
+  if (!player || player.dead || isAirborne(player, now)) return "";
+  return getPlayerPlatformZone(player, now)?.perch || "";
+}
+
 function setupAvatarPicker() {
   el.avatarPicker.innerHTML = avatarDefinitions
     .map((avatar) => {
@@ -549,6 +569,8 @@ function arenaDecorations() {
       <div class="battle-platform float-a"></div>
       <div class="battle-platform float-b"></div>
       <div class="battle-platform float-c"></div>
+      <div class="battle-platform float-d"></div>
+      <div class="battle-platform float-e"></div>
       <div class="arena-totem left"></div>
       <div class="arena-totem right"></div>
       <div class="arena-gate"></div>
@@ -566,6 +588,8 @@ function arenaForegroundDecorations() {
       <div class="foreground-mushroom mush-b"></div>
       <div class="foreground-lamp lamp-a"></div>
       <div class="foreground-lamp lamp-b"></div>
+      <div class="sky-bush perch-left"></div>
+      <div class="sky-bush perch-right"></div>
     </div>
   `;
 }
@@ -1078,6 +1102,7 @@ function applyJump(playerId) {
   const now = Date.now();
   if (now - player.lastJumpAt < JUMP_COOLDOWN || now < (player.hitUntil || 0)) return;
   player.lastJumpAt = now;
+  player.platformZoneId = null;
   player.airborneUntil = now + JUMP_AIR_TIME;
   broadcastState();
 }
@@ -1096,16 +1121,22 @@ function applyAttack(playerId) {
     if (target.id === attacker.id || target.dead) return;
     if (isAirborne(target, now) && !isAirborne(attacker, now)) return;
     if (isInHideZone(target, now) && !sameHideZone(attacker, target)) return;
+    if (!isSameCombatLayer(attacker, target, now)) return;
     const directionCheck = attacker.direction === "right" ? target.x >= attacker.x : target.x <= attacker.x;
     if (!directionCheck) return;
     if (Math.abs(target.x - attacker.x) > ATTACK_RANGE) return;
 
-    const damage = Math.floor(ATTACK_DAMAGE_MIN + Math.random() * (ATTACK_DAMAGE_MAX - ATTACK_DAMAGE_MIN + 1));
+    const highGroundBonus = Math.max(0, getPlayerTier(attacker, now) - getPlayerTier(target, now)) * 3;
+    const damage = Math.floor(ATTACK_DAMAGE_MIN + Math.random() * (ATTACK_DAMAGE_MAX - ATTACK_DAMAGE_MIN + 1)) + highGroundBonus;
     target.hp = Math.max(0, target.hp - damage);
     target.hitUntil = now + HIT_STUN;
     target.direction = target.x >= attacker.x ? "right" : "left";
     target.velocityX = attacker.direction === "right" ? 2.4 : -2.4;
     target.moveIntent = 0;
+    if (getPlayerTier(target, now) > 0 && getPlayerTier(attacker, now) >= getPlayerTier(target, now)) {
+      target.platformZoneId = null;
+      target.airborneUntil = Math.max(target.airborneUntil || 0, now + 260);
+    }
     target.x = clampX(target.x + target.velocityX * 1.1);
     attacker.velocityX = attacker.direction === "right" ? 1.1 : -1.1;
     addDamageBurst(target.x, damage, damage >= 24, attacker.avatarId);
@@ -1197,7 +1228,7 @@ function updatePlayerStatus() {
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else {
-    el.controllerHint.textContent = "左右移動接近對手，跳躍躲招，按 ATTACK 打出傷害。";
+    el.controllerHint.textContent = "左右移動搶平台，跳躍卡高點，按 ATTACK 從高台伏擊更有優勢。";
     el.playerStatusChip.textContent = "BATTLE";
     el.playerActionChip.textContent = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
     el.leftButton.disabled = false;
