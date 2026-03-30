@@ -20,6 +20,11 @@ const HIDE_ZONES = [
   { id: "center-stump", min: 46, max: 56 },
   { id: "right-shrub", min: 74, max: 85 }
 ];
+const PLATFORM_ZONES = [
+  { id: "float-a", min: 15, max: 27, bottom: 176 },
+  { id: "float-b", min: 69, max: 85, bottom: 214 },
+  { id: "float-c", min: 43, max: 55, bottom: 134 }
+];
 
 const avatarDefinitions = [
   { id: "rose", name: "Crimson Warrior", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
@@ -451,8 +456,58 @@ function isAlive(player) {
   return !player.dead && player.hp > 0;
 }
 
-function playerBottom(index) {
-  return 72 + (index % 6) * 14;
+function getPlatformZones() {
+  if (window.innerWidth >= 961) {
+    return [
+      { id: "float-a", min: 14, max: 29, bottom: 194 },
+      { id: "float-b", min: 66, max: 86, bottom: 242 },
+      { id: "float-c", min: 42, max: 56, bottom: 152 }
+    ];
+  }
+  return PLATFORM_ZONES;
+}
+
+function getPlatformZoneForX(x) {
+  return getPlatformZones().find((zone) => x >= zone.min && x <= zone.max) || null;
+}
+
+function getPlayerPlatformZone(player, now = Date.now()) {
+  if (!player || player.dead) return null;
+  const zoneAtPosition = getPlatformZoneForX(player.x);
+  if (isAirborne(player, now)) {
+    if (zoneAtPosition) {
+      player.platformZoneId = zoneAtPosition.id;
+      return zoneAtPosition;
+    }
+    return null;
+  }
+
+  if (player.platformZoneId) {
+    const lockedZone = getPlatformZones().find((zone) => zone.id === player.platformZoneId);
+    if (lockedZone && player.x >= lockedZone.min && player.x <= lockedZone.max) {
+      return lockedZone;
+    }
+  }
+
+  if (zoneAtPosition) {
+    player.platformZoneId = zoneAtPosition.id;
+    return zoneAtPosition;
+  }
+
+  player.platformZoneId = null;
+  return null;
+}
+
+function playerBottom(player, index, now = Date.now()) {
+  const laneOffset = 72 + (index % 6) * 14;
+  const platformZone = getPlayerPlatformZone(player, now);
+  const baseBottom = platformZone ? platformZone.bottom : laneOffset;
+  const jumpLift = isAirborne(player, now) ? 42 : 0;
+  return baseBottom + jumpLift;
+}
+
+function previewPlayerBottom(player, now = Date.now()) {
+  return Math.round(playerBottom(player, 0, now) * 0.72);
 }
 
 function setupAvatarPicker() {
@@ -484,9 +539,12 @@ function arenaDecorations() {
       <div class="battle-layer battle-sky"></div>
       <div class="battle-layer battle-clouds"></div>
       <div class="battle-layer battle-hills"></div>
+      <div class="battle-layer battle-waterfall"></div>
       <div class="battle-layer battle-village"></div>
+      <div class="battle-layer battle-ruins"></div>
       <div class="battle-layer battle-crystals"></div>
       <div class="battle-layer battle-trees"></div>
+      <div class="battle-layer battle-flowers"></div>
       <div class="battle-platform ground"></div>
       <div class="battle-platform float-a"></div>
       <div class="battle-platform float-b"></div>
@@ -568,6 +626,7 @@ function stepPlayerMotion(player, deltaScale, now = Date.now()) {
   if (player.dead || appState.gamePhase !== "battle") {
     player.moveIntent = 0;
     player.velocityX = 0;
+    player.platformZoneId = null;
     return previousVelocity !== 0;
   }
 
@@ -593,6 +652,7 @@ function stepPlayerMotion(player, deltaScale, now = Date.now()) {
     player.velocityX = 0;
   }
   player.x = nextX;
+  getPlayerPlatformZone(player, now);
 
   return Math.abs(player.x - previousX) > 0.01 || Math.abs((player.velocityX || 0) - previousVelocity) > 0.01 || previousDirection !== player.direction;
 }
@@ -782,6 +842,7 @@ function renderBattleArena(players) {
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
       const profile = getAvatarProfile(player.avatarId);
+      const groundedBottom = playerBottom(player, index);
       const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
       const fighterClass = [
         "battle-fighter",
@@ -798,7 +859,7 @@ function renderBattleArena(players) {
         .join(" ");
 
       return `
-        <div class="${fighterClass}" style="left:${player.x}%; bottom:${playerBottom(index)}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
+        <div class="${fighterClass}" style="left:${player.x}%; bottom:${groundedBottom}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
           <div class="fighter-name">${escapeHtml(crowdedMode ? player.name.slice(0, 8) : player.name)}</div>
           <div class="fighter-hp-bar">
             <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
@@ -807,6 +868,7 @@ function renderBattleArena(players) {
           <div class="runner-avatar">${avatarSvg(avatar)}</div>
           <div class="fighter-status">${combatStatusText(player)}</div>
           ${(player.attackingUntil || 0) > Date.now() && !player.dead && !crowdedMode ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
+          ${(player.hitUntil || 0) > Date.now() && !player.dead && !crowdedMode ? `<div class="hit-spark"></div>` : ""}
         </div>
       `;
     })
@@ -850,6 +912,7 @@ function renderPlayerPreview(player = appState.localPlayer) {
   appState.needsRender = false;
   const avatar = getAvatarById(player.avatarId);
   const profile = getAvatarProfile(player.avatarId);
+  const previewBottom = previewPlayerBottom(player);
   const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
   const fighterClass = [
     "battle-fighter",
@@ -866,7 +929,7 @@ function renderPlayerPreview(player = appState.localPlayer) {
   el.playerLanePreview.innerHTML = `
     <div class="battle-map preview-map">
       ${arenaDecorations()}
-      <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:74px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
+      <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:${previewBottom}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
         <div class="fighter-name">${escapeHtml(player.name)}</div>
         <div class="fighter-hp-bar">
           <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
@@ -874,6 +937,8 @@ function renderPlayerPreview(player = appState.localPlayer) {
         <div class="fighter-meta">${Math.max(0, player.hp)} HP</div>
         <div class="runner-avatar">${avatarSvg(avatar)}</div>
         <div class="fighter-status">${combatStatusText(player)}</div>
+        ${(player.attackingUntil || 0) > Date.now() && !player.dead ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
+        ${(player.hitUntil || 0) > Date.now() && !player.dead ? `<div class="hit-spark"></div>` : ""}
       </div>
       ${arenaForegroundDecorations()}
     </div>
@@ -938,6 +1003,7 @@ function createPlayer(messagePlayer) {
     attackingUntil: 0,
     hitUntil: 0,
     moveIntent: 0,
+    platformZoneId: null,
     velocityX: 0,
     lastJumpAt: 0,
     lastAttackAt: 0
@@ -961,6 +1027,7 @@ function resetBattle() {
     player.attackingUntil = 0;
     player.hitUntil = 0;
     player.moveIntent = 0;
+    player.platformZoneId = null;
     player.velocityX = 0;
     player.lastJumpAt = 0;
     player.lastAttackAt = 0;
