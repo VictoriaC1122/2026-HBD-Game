@@ -1959,6 +1959,32 @@ button {
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
 }
 
+.boost-button.is-hit-confirm {
+  background: linear-gradient(180deg, #fff2a6, #ff9f43 48%, #ff6b6b 100%);
+  box-shadow: 0 10px 0 #9b3b2c, 0 0 28px rgba(255, 190, 87, 0.56);
+  animation: mobile-hit-confirm 420ms ease-out;
+}
+
+.boost-button.is-hit-confirm span,
+.boost-button.is-hit-confirm small {
+  color: #fffdf3;
+}
+
+@keyframes mobile-hit-confirm {
+  0% {
+    transform: scale(0.96);
+    filter: saturate(1);
+  }
+  35% {
+    transform: scale(1.03);
+    filter: saturate(1.3) brightness(1.08);
+  }
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
+}
+
 .boost-button span,
 .boost-button small {
   display: block;

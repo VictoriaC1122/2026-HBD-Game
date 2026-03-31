@@ -75,6 +75,9 @@ const appState = {
   lastLocalJumpAt: 0,
   lastLocalAttackAt: 0,
   damageBursts: [],
+  lastAttackHitAt: 0,
+  lastAttackDamage: 0,
+  lastAttackVictim: "",
   activeMoveDirection: null,
   localMoveTimer: null,
   renderLoopStarted: false,
@@ -373,6 +376,17 @@ function playVictoryFanfare() {
   setTimeout(() => playTone(783.99, 0.2, "square", 0.08), 240);
   setTimeout(() => playTone(1046.5, 0.24, "triangle", 0.06), 360);
   setTimeout(() => playTone(1318.5, 0.3, "triangle", 0.045), 460);
+}
+
+function triggerMobileHitFeedback(amount = 0, targetName = "") {
+  appState.lastAttackHitAt = Date.now();
+  appState.lastAttackDamage = amount;
+  appState.lastAttackVictim = targetName;
+  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+    navigator.vibrate([40, 30, 60]);
+  }
+  appState.needsRender = true;
+  updatePlayerStatus();
 }
 
 function getPhaseLabel() {
@@ -1257,6 +1271,8 @@ function applyAttack(playerId) {
   attacker.lastAttackAt = now;
   attacker.attackingUntil = now + 240;
   let anyHit = false;
+  let totalDamage = 0;
+  let lastTargetName = "";
 
   appState.players.forEach((target) => {
     if (target.id === attacker.id || target.dead) return;
@@ -1282,6 +1298,8 @@ function applyAttack(playerId) {
     attacker.velocityX = attacker.direction === "right" ? 1.1 : -1.1;
     addDamageBurst(target.x, damage, damage >= 24, attacker.avatarId);
     anyHit = true;
+    totalDamage += damage;
+    lastTargetName = target.name;
 
     if (target.hp <= 0) {
       target.dead = true;
@@ -1294,6 +1312,14 @@ function applyAttack(playerId) {
 
   if (anyHit) {
     playHitTone();
+    const attackerConnection = appState.connections.get(attacker.id);
+    if (attackerConnection?.open) {
+      attackerConnection.send({
+        type: "attack-hit",
+        amount: totalDamage,
+        targetName: lastTargetName
+      });
+    }
   }
 
   maybeDeclareWinner();
@@ -1326,6 +1352,8 @@ function updatePlayerStatus() {
   if (!appState.localPlayer) return;
   const me = appState.localPlayer;
   const winner = appState.winnerId ? me.id === appState.winnerId : false;
+  const hitAge = Date.now() - (appState.lastAttackHitAt || 0);
+  el.attackButton.classList.toggle("is-hit-confirm", hitAge < 420);
 
   if (appState.gamePhase === "countdown") {
     el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備左右移動、跳躍、攻擊。`;
@@ -1369,9 +1397,16 @@ function updatePlayerStatus() {
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else {
-    el.controllerHint.textContent = "左右移動搶平台，踩彈跳菇衝高點，小心掉落區，按 ATTACK 從高台伏擊更有優勢。";
+    if (hitAge < 1200) {
+      const targetLabel = appState.lastAttackVictim ? `命中 ${appState.lastAttackVictim}` : "命中對手";
+      const damageLabel = appState.lastAttackDamage ? `，${appState.lastAttackDamage} DAMAGE` : "";
+      el.controllerHint.textContent = `${targetLabel}${damageLabel}。繼續追打。`;
+      el.playerActionChip.textContent = "HIT CONFIRM";
+    } else {
+      el.controllerHint.textContent = "左右移動搶平台，踩彈跳菇衝高點，小心掉落區，按 ATTACK 從高台伏擊更有優勢。";
+      el.playerActionChip.textContent = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
+    }
     el.playerStatusChip.textContent = "BATTLE";
-    el.playerActionChip.textContent = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
     el.leftButton.disabled = false;
     el.rightButton.disabled = false;
     el.jumpButton.disabled = false;
@@ -1583,6 +1618,10 @@ function startPlayerMode(hostId) {
         playVictoryFanfare();
         updatePlayerStatus();
         updatePlayerUxMeta();
+      }
+
+      if (message.type === "attack-hit") {
+        triggerMobileHitFeedback(message.amount, message.targetName);
       }
     });
 
