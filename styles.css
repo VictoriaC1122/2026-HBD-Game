@@ -1,18 +1,18 @@
 :root {
-  --bg-top: #8cd6ff;
-  --bg-mid: #d8f3ff;
-  --bg-bottom: #f4cf7c;
-  --panel: rgba(255, 255, 255, 0.88);
+  --bg-top: #7ec8ff;
+  --bg-mid: #e7f7ff;
+  --bg-bottom: #f4d99c;
+  --panel: rgba(255, 255, 255, 0.9);
   --panel-strong: #ffffff;
-  --panel-edge: rgba(255, 255, 255, 0.58);
-  --ink: #1b2237;
-  --muted: #67738f;
-  --accent: #f04c63;
-  --accent-dark: #bd243f;
-  --accent-blue: #469cff;
-  --gold: #ffd96b;
-  --pixel-border: #151826;
-  --shadow: 0 18px 0 rgba(0, 0, 0, 0.18), 0 30px 50px rgba(14, 25, 45, 0.18);
+  --panel-edge: rgba(255, 255, 255, 0.68);
+  --ink: #2d2246;
+  --muted: #6e7293;
+  --accent: #ff6d92;
+  --accent-dark: #c34372;
+  --accent-blue: #59a9ff;
+  --gold: #ffe38a;
+  --pixel-border: #3f3560;
+  --shadow: 0 18px 0 rgba(90, 74, 122, 0.16), 0 30px 54px rgba(56, 54, 98, 0.2);
   --display-font: "Jersey 10", "Noto Sans TC", sans-serif;
   --ui-font: "Outfit", "Noto Sans TC", sans-serif;
   --body-font: "Noto Sans TC", sans-serif;
@@ -28,8 +28,10 @@ body {
   color: var(--ink);
   font-family: var(--body-font);
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.66), transparent 28%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 56%, var(--bg-bottom) 100%);
+    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.78), transparent 24%),
+    radial-gradient(circle at 14% 28%, rgba(255, 226, 240, 0.55), transparent 22%),
+    radial-gradient(circle at 88% 26%, rgba(255, 248, 193, 0.52), transparent 18%),
+    linear-gradient(180deg, var(--bg-top) 0%, #cfeeff 24%, var(--bg-mid) 56%, var(--bg-bottom) 100%);
 }
 
 button,
@@ -183,8 +185,8 @@ button {
   margin-bottom: 18px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(253, 242, 221, 0.92)),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 244, 235, 0.94)),
+    linear-gradient(135deg, rgba(255, 214, 233, 0.18), transparent 40%, rgba(182, 227, 255, 0.16));
 }
 
 .hero-card::before,
@@ -194,8 +196,8 @@ button {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.46), transparent 34%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.1));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), transparent 34%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.14));
   opacity: 0.9;
 }
 
@@ -353,7 +355,8 @@ button {
   padding: 22px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 255, 0.82)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 244, 255, 0.88)),
+    linear-gradient(135deg, rgba(255, 221, 236, 0.12), transparent 48%, rgba(203, 236, 255, 0.12)),
     var(--panel);
 }
 
@@ -386,8 +389,8 @@ button {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.65)),
-    linear-gradient(180deg, #fff 0 90%, #ececec 90% 100%);
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), rgba(255, 241, 247, 0.72)),
+    linear-gradient(180deg, #fff 0 90%, #ece8ff 90% 100%);
 }
 
 .room-meta {
@@ -397,7 +400,7 @@ button {
 
 .stat-block {
   padding: 14px;
-  background: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 255, 0.88));
 }
 
 .stat-label {
@@ -432,7 +435,7 @@ button {
 
 .host-mini-card {
   padding: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(236,244,255,0.88));
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,241,255,0.9));
 }
 
 .host-mini-label {
@@ -453,7 +456,7 @@ button {
 
 .guide-pill {
   padding: 8px 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(246,240,255,0.82));
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(249,239,255,0.88));
   font-family: var(--ui-font);
   font-size: 13px;
   font-weight: 800;
@@ -471,7 +474,7 @@ button {
   margin-top: 14px;
   padding: 12px 14px;
   border: 3px solid var(--pixel-border);
-  background: linear-gradient(180deg, rgba(255, 250, 225, 0.96), rgba(255, 239, 190, 0.9));
+  background: linear-gradient(180deg, rgba(255, 248, 229, 0.98), rgba(255, 235, 194, 0.92));
   box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.1);
   font-family: var(--ui-font);
 }
@@ -506,13 +509,13 @@ button {
 
 .primary-button {
   color: #fff;
-  background: linear-gradient(180deg, #ff7f92 0 14%, var(--accent) 14% 74%, var(--accent-dark) 74% 100%);
-  box-shadow: 0 8px 0 #7a1d1d, inset 0 2px 0 rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, #ffabc5 0 14%, var(--accent) 14% 74%, var(--accent-dark) 74% 100%);
+  box-shadow: 0 8px 0 #8b3460, inset 0 2px 0 rgba(255, 255, 255, 0.32);
 }
 
 .secondary-button {
-  background: linear-gradient(180deg, #ffffff 0 14%, #f2f3f8 14% 74%, #dadce7 74% 100%);
-  box-shadow: 0 8px 0 #b8b8b8, inset 0 2px 0 rgba(255, 255, 255, 0.78);
+  background: linear-gradient(180deg, #ffffff 0 14%, #f4f0ff 14% 74%, #dad8ef 74% 100%);
+  box-shadow: 0 8px 0 #b2a8d0, inset 0 2px 0 rgba(255, 255, 255, 0.82);
 }
 
 .primary-button:hover,
@@ -573,10 +576,11 @@ button {
   position: relative;
   padding: 16px;
   background:
-    radial-gradient(circle at 50% 0, rgba(122, 155, 255, 0.18), transparent 44%),
-    linear-gradient(180deg, #26304a 0%, #182236 100%);
+    radial-gradient(circle at 50% 0, rgba(255, 207, 233, 0.18), transparent 40%),
+    radial-gradient(circle at 12% 18%, rgba(130, 190, 255, 0.16), transparent 24%),
+    linear-gradient(180deg, #4e4874 0%, #2f3558 100%);
   border: 4px solid var(--pixel-border);
-  box-shadow: inset 0 0 0 4px #5d667d, inset 0 14px 40px rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 4px #8a86b2, inset 0 14px 40px rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -589,9 +593,9 @@ button {
   min-width: 150px;
   padding: 10px 12px;
   background:
-    linear-gradient(180deg, rgba(44, 58, 92, 0.98), rgba(17, 24, 39, 0.96));
+    linear-gradient(180deg, rgba(120, 108, 173, 0.98), rgba(70, 66, 118, 0.96));
   color: #fff;
-  box-shadow: 0 8px 0 rgba(7, 11, 18, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 0 rgba(49, 42, 86, 0.36), inset 0 2px 0 rgba(255, 255, 255, 0.14);
 }
 
 .hud-chip strong {
@@ -636,8 +640,8 @@ button {
   overflow: hidden;
   border: 4px solid var(--pixel-border);
   background:
-    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.46), transparent 22%),
-    linear-gradient(180deg, #d9fbff 0%, #8fdfff 22%, #c5ffe0 46%, #8dde7d 62%, #43683a 100%);
+    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.58), transparent 20%),
+    linear-gradient(180deg, #dff7ff 0%, #9ed9ff 22%, #dbffd7 44%, #a2e297 62%, #5d8f52 100%);
 }
 
 .battle-map::before {
@@ -646,10 +650,10 @@ button {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 28%),
-    radial-gradient(circle at 18% 78%, rgba(255, 236, 184, 0.18), transparent 24%),
-    radial-gradient(circle at 84% 70%, rgba(233, 255, 241, 0.16), transparent 22%),
-    linear-gradient(90deg, rgba(255,255,255,0.08), transparent 30%, transparent 70%, rgba(255,255,255,0.07));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 28%),
+    radial-gradient(circle at 18% 78%, rgba(255, 236, 184, 0.24), transparent 24%),
+    radial-gradient(circle at 84% 70%, rgba(233, 255, 241, 0.22), transparent 22%),
+    linear-gradient(90deg, rgba(255,255,255,0.12), transparent 30%, transparent 70%, rgba(255,255,255,0.1));
   z-index: 1;
 }
 
@@ -673,20 +677,21 @@ button {
 
 .battle-clouds {
   background:
-    radial-gradient(circle at 12% 26%, rgba(255,255,255,0.92) 0 24px, transparent 25px),
-    radial-gradient(circle at 16% 24%, rgba(255,255,255,0.92) 0 30px, transparent 31px),
-    radial-gradient(circle at 44% 22%, rgba(255,255,255,0.88) 0 22px, transparent 23px),
-    radial-gradient(circle at 48% 20%, rgba(255,255,255,0.88) 0 28px, transparent 29px),
-    radial-gradient(circle at 76% 30%, rgba(255,255,255,0.92) 0 26px, transparent 27px),
-    radial-gradient(circle at 82% 28%, rgba(255,255,255,0.92) 0 32px, transparent 33px);
+    radial-gradient(circle at 12% 26%, rgba(255,255,255,0.96) 0 28px, transparent 29px),
+    radial-gradient(circle at 16% 24%, rgba(255,255,255,0.96) 0 36px, transparent 37px),
+    radial-gradient(circle at 44% 22%, rgba(255,255,255,0.9) 0 24px, transparent 25px),
+    radial-gradient(circle at 48% 20%, rgba(255,255,255,0.9) 0 32px, transparent 33px),
+    radial-gradient(circle at 76% 30%, rgba(255,255,255,0.96) 0 30px, transparent 31px),
+    radial-gradient(circle at 82% 28%, rgba(255,255,255,0.96) 0 38px, transparent 39px);
+  opacity: 0.96;
 }
 
 .battle-hills {
   background:
-    radial-gradient(circle at 18% 88%, #8fd2a0 0 120px, transparent 121px),
-    radial-gradient(circle at 42% 84%, #77bf8a 0 150px, transparent 151px),
-    radial-gradient(circle at 76% 86%, #94d6b0 0 132px, transparent 133px);
-  opacity: 0.78;
+    radial-gradient(circle at 18% 88%, #97dcae 0 132px, transparent 133px),
+    radial-gradient(circle at 42% 84%, #7fc798 0 170px, transparent 171px),
+    radial-gradient(circle at 76% 86%, #a2dfbb 0 146px, transparent 147px);
+  opacity: 0.82;
 }
 
 .battle-waterfall {
@@ -700,16 +705,17 @@ button {
 
 .battle-village {
   background:
-    linear-gradient(#e7c89c 0 0) 14% 61% / 82px 52px no-repeat,
-    linear-gradient(#8a4f36 0 0) 13% 55% / 92px 22px no-repeat,
+    linear-gradient(#f0d8b2 0 0) 14% 61% / 82px 52px no-repeat,
+    linear-gradient(#a45b4f 0 0) 13% 55% / 92px 22px no-repeat,
     linear-gradient(#fff4dc 0 0) 18% 66% / 16px 16px no-repeat,
-    linear-gradient(#f4dfc2 0 0) 48% 58% / 96px 58px no-repeat,
-    linear-gradient(#87513b 0 0) 47% 52% / 104px 24px no-repeat,
+    linear-gradient(#f9ead8 0 0) 48% 58% / 96px 58px no-repeat,
+    linear-gradient(#9a5f56 0 0) 47% 52% / 104px 24px no-repeat,
     linear-gradient(#fff4dc 0 0) 51% 64% / 18px 16px no-repeat,
-    linear-gradient(#e2c396 0 0) 78% 60% / 74px 46px no-repeat,
-    linear-gradient(#7f4b35 0 0) 77% 55% / 82px 20px no-repeat,
+    linear-gradient(#efd3ad 0 0) 78% 60% / 74px 46px no-repeat,
+    linear-gradient(#8c5646 0 0) 77% 55% / 82px 20px no-repeat,
     linear-gradient(#fff4dc 0 0) 80% 66% / 14px 14px no-repeat;
-  opacity: 0.8;
+  opacity: 0.86;
+  filter: drop-shadow(0 8px 10px rgba(127, 86, 73, 0.18));
 }
 
 .battle-ruins {
@@ -720,7 +726,7 @@ button {
     linear-gradient(#efe7ff 0 0) 63% 57% / 54px 26px no-repeat,
     linear-gradient(#e5dbff 0 0) 83% 40% / 20px 94px no-repeat,
     linear-gradient(#f7f0ff 0 0) 80% 39% / 76px 20px no-repeat;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .battle-crystals {
@@ -730,19 +736,19 @@ button {
     linear-gradient(#f3fdff 0 0) 78% 52% / 38px 72px no-repeat,
     linear-gradient(#71d0ff 0 0) 80% 53.5% / 20px 64px no-repeat;
   opacity: 0.95;
-  filter: drop-shadow(0 0 14px rgba(159, 240, 255, 0.52));
+  filter: drop-shadow(0 0 18px rgba(159, 240, 255, 0.58));
 }
 
 .battle-trees {
   background:
-    radial-gradient(circle at 10% 72%, #9bf59c 0 52px, transparent 53px),
-    linear-gradient(#5b8c44 0 0) 9.8% 75% / 18px 21% no-repeat,
-    radial-gradient(circle at 28% 68%, #b6ffae 0 64px, transparent 65px),
-    linear-gradient(#5b8c44 0 0) 28% 74% / 22px 24% no-repeat,
-    radial-gradient(circle at 71% 70%, #8ded95 0 56px, transparent 57px),
-    linear-gradient(#5b8c44 0 0) 71% 75% / 18px 22% no-repeat,
-    radial-gradient(circle at 90% 72%, #b6ffae 0 50px, transparent 51px),
-    linear-gradient(#5b8c44 0 0) 90% 76% / 18px 20% no-repeat;
+    radial-gradient(circle at 10% 72%, #a7f6a4 0 58px, transparent 59px),
+    linear-gradient(#6d9055 0 0) 9.8% 75% / 18px 21% no-repeat,
+    radial-gradient(circle at 28% 68%, #c4ffbb 0 72px, transparent 73px),
+    linear-gradient(#6d9055 0 0) 28% 74% / 22px 24% no-repeat,
+    radial-gradient(circle at 71% 70%, #9bf0a0 0 64px, transparent 65px),
+    linear-gradient(#6d9055 0 0) 71% 75% / 18px 22% no-repeat,
+    radial-gradient(circle at 90% 72%, #c4ffbb 0 56px, transparent 57px),
+    linear-gradient(#6d9055 0 0) 90% 76% / 18px 20% no-repeat;
 }
 
 .battle-flowers {
@@ -924,8 +930,8 @@ button {
   position: absolute;
   border: 3px solid rgba(24, 30, 28, 0.92);
   background:
-    linear-gradient(180deg, #f8fff2 0 26%, #d2f5bd 26% 34%, #72c469 34% 100%);
-  box-shadow: inset 0 -10px 0 rgba(43, 92, 45, 0.18), 0 10px 0 rgba(19, 34, 14, 0.14);
+    linear-gradient(180deg, #fffdf4 0 18%, #e7ffcc 18% 32%, #7ac971 32% 100%);
+  box-shadow: inset 0 -10px 0 rgba(43, 92, 45, 0.18), 0 10px 0 rgba(19, 34, 14, 0.14), 0 0 0 3px rgba(255,255,255,0.18);
 }
 
 .battle-platform.ground {
@@ -1076,8 +1082,12 @@ button {
 .battle-map-copy {
   padding: 12px 14px;
   max-width: 540px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 247, 255, 0.78));
-  backdrop-filter: blur(5px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 242, 255, 0.82)),
+    linear-gradient(135deg, rgba(255, 221, 241, 0.16), transparent 55%, rgba(203, 239, 255, 0.16));
+  backdrop-filter: blur(7px);
+  border: 3px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 24px rgba(108, 101, 155, 0.16);
 }
 
 .battle-map-copy strong {
@@ -1099,11 +1109,11 @@ button {
 .battle-chip {
   padding: 10px 12px;
   color: #fff;
-  background: linear-gradient(180deg, rgba(43, 55, 93, 0.96), rgba(24, 34, 56, 0.9));
-  border: 3px solid #fff;
+  background: linear-gradient(180deg, rgba(134, 112, 185, 0.96), rgba(92, 75, 145, 0.92));
+  border: 3px solid rgba(255,255,255,0.92);
   font-family: var(--display-font);
   font-size: 20px;
-  box-shadow: 0 8px 0 rgba(17, 22, 39, 0.34);
+  box-shadow: 0 8px 0 rgba(76, 58, 117, 0.32);
 }
 
 .battle-fighter {
@@ -1175,8 +1185,10 @@ button {
   height: 58px;
   margin: 0 auto;
   border: 3px solid var(--pixel-border);
-  background: linear-gradient(180deg, #ffffff, #eef3ff);
-  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.16), inset 0 2px 0 rgba(255, 255, 255, 0.8);
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,0.9), transparent 28%),
+    linear-gradient(180deg, #ffffff, #eef3ff);
+  box-shadow: 5px 5px 0 rgba(82, 63, 110, 0.16), inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(255,255,255,0.28);
   animation: idle-bob 1.35s ease-in-out infinite;
 }
 
@@ -1673,15 +1685,15 @@ button {
 }
 
 .podium-card[data-rank="1"] {
-  background: linear-gradient(180deg, #fffad8, #ffd559);
+  background: linear-gradient(180deg, #fff7dd, #ffd976);
 }
 
 .podium-card[data-rank="2"] {
-  background: linear-gradient(180deg, #f5f6fb, #d4dae5);
+  background: linear-gradient(180deg, #f8f5ff, #dcd7f1);
 }
 
 .podium-card[data-rank="3"] {
-  background: linear-gradient(180deg, #ffe9db, #d79463);
+  background: linear-gradient(180deg, #ffece3, #dfa171);
 }
 
 .podium-card strong {
@@ -1714,7 +1726,7 @@ button {
   width: 100%;
   margin-bottom: 18px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.94);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,245,255,0.92));
   font-family: var(--ui-font);
   font-size: 16px;
 }
@@ -1728,12 +1740,12 @@ button {
 
 .avatar-option {
   padding: 12px 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 247, 255, 0.86));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 243, 255, 0.9));
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
 .avatar-option.selected {
-  background: linear-gradient(180deg, #fff8d7, #ffe79a);
+  background: linear-gradient(180deg, #fff4dd, #ffdca0);
   outline: 4px solid var(--accent);
 }
 
@@ -1754,6 +1766,7 @@ button {
   width: 64px;
   height: 64px;
   margin: 0 auto;
+  filter: drop-shadow(0 8px 12px rgba(104, 87, 148, 0.16));
 }
 
 .avatar-name {
