@@ -79,6 +79,11 @@ const appState = {
   localMoveTimer: null,
   renderLoopStarted: false,
   needsRender: true,
+  platformCacheKey: "",
+  platformCache: [],
+  lastTrackMarkup: "",
+  lastPreviewMarkup: "",
+  lastPodiumMarkup: "",
   lastRenderAt: 0,
   lastPhysicsAt: 0,
   lastStateSyncAt: 0
@@ -449,14 +454,14 @@ function updateRoundBanner() {
   el.playerRoundBanner.classList.add("hidden");
 }
 
-function combatStatusText(player) {
+function combatStatusText(player, now = Date.now()) {
   if (!player || player.dead) return "OUT";
-  if ((player.attackingUntil || 0) > Date.now()) return "SLASH";
-  if ((player.hitUntil || 0) > Date.now()) return "HIT";
-  if ((player.airborneUntil || 0) > Date.now()) return "JUMP";
-  if (Date.now() - (player.lastSpringAt || 0) < 280) return "BOOST";
-  if (getPerchLabel(player)) return "PERCH";
-  if (isInHideZone(player)) return "HIDE";
+  if ((player.attackingUntil || 0) > now) return "SLASH";
+  if ((player.hitUntil || 0) > now) return "HIT";
+  if ((player.airborneUntil || 0) > now) return "JUMP";
+  if (now - (player.lastSpringAt || 0) < 280) return "BOOST";
+  if (getPerchLabel(player, now)) return "PERCH";
+  if (isInHideZone(player, now)) return "HIDE";
   return "READY";
 }
 
@@ -495,8 +500,14 @@ function getMovingPlatformOffset(now = Date.now(), deltaMs = 16.67) {
 }
 
 function getPlatformZones(now = Date.now()) {
+  const cacheKey = `${window.innerWidth >= 961 ? "desktop" : "mobile"}-${Math.floor(now / 33)}`;
+  if (appState.platformCacheKey === cacheKey && appState.platformCache.length) {
+    return appState.platformCache;
+  }
+
+  let zones;
   if (window.innerWidth >= 961) {
-    return [
+    zones = [
       { id: "float-a", min: 14, max: 29, bottom: 194, tier: 1, perch: "蘑菇跳台" },
       { id: "float-b", min: 66, max: 86, bottom: 242, tier: 2, perch: "高空樹台" },
       { id: "float-c", min: 42, max: 56, bottom: 152, tier: 1, perch: "中央石橋" },
@@ -504,8 +515,12 @@ function getPlatformZones(now = Date.now()) {
       { id: "float-e", min: 82, max: 93, bottom: 176, tier: 1, perch: "右側枝台" },
       getMovingPlatformZone(now)
     ];
+  } else {
+    zones = [...PLATFORM_ZONES, getMovingPlatformZone(now)];
   }
-  return [...PLATFORM_ZONES, getMovingPlatformZone(now)];
+  appState.platformCacheKey = cacheKey;
+  appState.platformCache = zones;
+  return zones;
 }
 
 function getPlatformZoneForX(x, now = Date.now()) {
@@ -896,8 +911,15 @@ function renderCountdownOverlay() {
   el.countdownLabel.textContent = appState.countdownValue === "FIGHT!" ? "BATTLE!" : "READY";
 }
 
+function setMarkup(target, markup, cacheKey) {
+  if (!target) return;
+  if (appState[cacheKey] === markup) return;
+  target.innerHTML = markup;
+  appState[cacheKey] = markup;
+}
+
 function renderPodium(players) {
-  el.podium.innerHTML = players
+  const markup = players
     .slice(0, 4)
     .map((player, index) => {
       const avatar = getAvatarById(player.avatarId);
@@ -913,15 +935,18 @@ function renderPodium(players) {
       `;
     })
     .join("");
+  setMarkup(el.podium, markup, "lastPodiumMarkup");
 }
 
 function renderBattleArena(players) {
   appState.needsRender = false;
+  const now = Date.now();
   const sorted = [...players].sort((a, b) => {
     if (Number(isAlive(b)) !== Number(isAlive(a))) return Number(isAlive(b)) - Number(isAlive(a));
     return b.hp - a.hp;
   });
   const crowdedMode = sorted.length >= 18;
+  const reducedEffectsMode = sorted.length >= 28;
 
   el.playerCount.textContent = String(sorted.length);
   el.hudPlayers.textContent = String(sorted.length);
@@ -933,6 +958,7 @@ function renderBattleArena(players) {
   updateHostUx(sorted.length, alivePlayers.length);
 
   const damageMarkup = appState.damageBursts
+    .slice(reducedEffectsMode ? -4 : -10)
     .map((burst) => {
       const profile = getAvatarProfile(burst.avatarId);
       return `
@@ -942,7 +968,7 @@ function renderBattleArena(players) {
     .join("");
 
   if (!sorted.length) {
-    el.track.innerHTML = `
+    const emptyMarkup = `
       <div class="battle-map">
         ${arenaDecorations()}
         <div class="battle-map-copy">
@@ -951,6 +977,7 @@ function renderBattleArena(players) {
         </div>
       </div>
     `;
+    setMarkup(el.track, emptyMarkup, "lastTrackMarkup");
     el.raceSummary.textContent = "等待玩家加入...";
     el.startRaceButton.disabled = true;
     renderCountdownOverlay();
@@ -972,9 +999,9 @@ function renderBattleArena(players) {
         isInHideZone(player) ? "is-hidden-cover" : "",
         Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
         player.dead ? "is-dead" : "",
-        isAirborne(player) ? "is-jumping" : "",
-        (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
-        (player.hitUntil || 0) > Date.now() ? "is-hit" : "",
+        isAirborne(player, now) ? "is-jumping" : "",
+        (player.attackingUntil || 0) > now ? "is-attacking" : "",
+        (player.hitUntil || 0) > now ? "is-hit" : "",
         player.direction === "left" ? "face-left" : ""
       ]
         .filter(Boolean)
@@ -988,21 +1015,21 @@ function renderBattleArena(players) {
           </div>
           <div class="fighter-meta">${Math.max(0, player.hp)}${crowdedMode ? "" : " HP"}</div>
           <div class="runner-avatar">${avatarSvg(avatar)}</div>
-          <div class="fighter-status">${combatStatusText(player)}</div>
-          ${(player.attackingUntil || 0) > Date.now() && !player.dead && !crowdedMode ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
-          ${(player.hitUntil || 0) > Date.now() && !player.dead && !crowdedMode ? `<div class="hit-spark"></div>` : ""}
+          <div class="fighter-status">${combatStatusText(player, now)}</div>
+          ${(player.attackingUntil || 0) > now && !player.dead && !crowdedMode && !reducedEffectsMode ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
+          ${(player.hitUntil || 0) > now && !player.dead && !crowdedMode && !reducedEffectsMode ? `<div class="hit-spark"></div>` : ""}
         </div>
       `;
     })
     .join("");
 
-  el.track.innerHTML = `
+  const trackMarkup = `
     <div class="battle-map">
       ${arenaDecorations()}
       <div class="battle-map-header">
         <div class="battle-map-copy">
           <strong>生日亂鬥競技場</strong>
-          <span>${crowdedMode ? "40 人同場優化模式啟動中，介面會自動精簡，讓大場面也保持順暢。" : "移動、跳躍、揮擊，把其他人打到血條歸零。最後活著的人獲勝。"}</span>
+          <span>${reducedEffectsMode ? "超多人模式啟動中，會自動精簡特效與傷害字，優先保持戰場順暢。" : crowdedMode ? "40 人同場優化模式啟動中，介面會自動精簡，讓大場面也保持順暢。" : "移動、跳躍、揮擊，把其他人打到血條歸零。最後活著的人獲勝。"}</span>
         </div>
         <div class="battle-chip">${alivePlayers.length} ALIVE</div>
       </div>
@@ -1012,6 +1039,7 @@ function renderBattleArena(players) {
       ${appState.gamePhase === "finished" && appState.winnerId ? renderWinnerShowcase() : ""}
     </div>
   `;
+  setMarkup(el.track, trackMarkup, "lastTrackMarkup");
 
   renderPodium(sorted);
 
@@ -1032,6 +1060,7 @@ function renderBattleArena(players) {
 function renderPlayerPreview(player = appState.localPlayer) {
   if (!player) return;
   appState.needsRender = false;
+  const now = Date.now();
   const avatar = getAvatarById(player.avatarId);
   const profile = getAvatarProfile(player.avatarId);
   const previewBottom = previewPlayerBottom(player);
@@ -1040,15 +1069,15 @@ function renderPlayerPreview(player = appState.localPlayer) {
     "battle-fighter",
     Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
     player.dead ? "is-dead" : "",
-    isAirborne(player) ? "is-jumping" : "",
-    (player.attackingUntil || 0) > Date.now() ? "is-attacking" : "",
-    (player.hitUntil || 0) > Date.now() ? "is-hit" : "",
+    isAirborne(player, now) ? "is-jumping" : "",
+    (player.attackingUntil || 0) > now ? "is-attacking" : "",
+    (player.hitUntil || 0) > now ? "is-hit" : "",
     player.direction === "left" ? "face-left" : ""
   ]
     .filter(Boolean)
     .join(" ");
 
-  el.playerLanePreview.innerHTML = `
+  const previewMarkup = `
     <div class="battle-map preview-map">
       ${arenaDecorations()}
       <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:${previewBottom}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
@@ -1058,13 +1087,14 @@ function renderPlayerPreview(player = appState.localPlayer) {
         </div>
         <div class="fighter-meta">${Math.max(0, player.hp)} HP</div>
         <div class="runner-avatar">${avatarSvg(avatar)}</div>
-        <div class="fighter-status">${combatStatusText(player)}</div>
-        ${(player.attackingUntil || 0) > Date.now() && !player.dead ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
-        ${(player.hitUntil || 0) > Date.now() && !player.dead ? `<div class="hit-spark"></div>` : ""}
+        <div class="fighter-status">${combatStatusText(player, now)}</div>
+        ${(player.attackingUntil || 0) > now && !player.dead ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
+        ${(player.hitUntil || 0) > now && !player.dead ? `<div class="hit-spark"></div>` : ""}
       </div>
       ${arenaForegroundDecorations()}
     </div>
   `;
+  setMarkup(el.playerLanePreview, previewMarkup, "lastPreviewMarkup");
 }
 
 function renderWinnerShowcase() {
