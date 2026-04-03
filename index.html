@@ -59,28 +59,12 @@
               掃 QR Code 用手機加入，全部人同場開打。左右移動、跳躍、揮擊，血條歸零就淘汰，最後活著的人就是今晚冠軍。
             </p>
           </div>
-          <div class="hero-steps">
+          <div class="hero-steps hero-summary-card">
             <div class="mini-step">
-              <span>1</span>
-              <strong>掃碼進場</strong>
-              <p>房主顯示 QR Code，大家用手機加入戰場。</p>
-            </div>
-            <div class="mini-step">
-              <span>2</span>
-              <strong>左右跳打</strong>
-              <p>用手機控制角色移動、跳躍與攻擊。</p>
-            </div>
-            <div class="mini-step">
-              <span>3</span>
-              <strong>活到最後</strong>
-              <p>血條歸零就淘汰，最後存活的人獲勝。</p>
+              <strong>掃碼加入，手機直接操控</strong>
+              <p>房主開畫面，玩家掃碼進場，同場亂鬥到最後一人。</p>
             </div>
           </div>
-        </div>
-        <div class="hero-pill-row">
-          <span class="hero-pill">多人同場亂鬥</span>
-          <span class="hero-pill">血條與傷害字</span>
-          <span class="hero-pill">手機直接操控</span>
         </div>
       </section>
 
@@ -112,9 +96,6 @@
                   <span class="stat-label">目前玩家</span>
                   <strong id="playerCount">0</strong>
                 </div>
-                <p class="hint-text">
-                  建議把主機畫面投到電視。每位玩家用手機操控自己的角色，打到最後活下來的人獲勝。
-                </p>
               </div>
             </div>
           </div>
@@ -146,15 +127,6 @@
               <strong>下一步</strong>
               <span>等待至少 2 位玩家加入後開始。</span>
             </div>
-            <div class="quick-guide">
-              <div class="guide-pill">LEFT / RIGHT</div>
-              <div class="guide-pill">JUMP 跳躍</div>
-              <div class="guide-pill">ATTACK 揮擊</div>
-              <div class="guide-pill">最後存活獲勝</div>
-            </div>
-            <p class="hint-text">
-              開始後會先倒數，再正式開打。跳起來可以閃掉部分攻擊，近距離揮擊能打出傷害與擊退。
-            </p>
           </div>
         </div>
 
@@ -165,13 +137,6 @@
               <h2>奇幻亂鬥競技場</h2>
             </div>
             <div id="raceSummary" class="race-summary">等待玩家加入...</div>
-          </div>
-
-          <div class="track-legend">
-            <span><i class="legend-boost"></i> 揮擊範圍</span>
-            <span><i class="legend-trap"></i> 高台伏擊</span>
-            <span><i class="legend-boost"></i> 彈跳菇 / 巡航台</span>
-            <span><i class="legend-finish"></i> 最後存活者</span>
           </div>
 
           <div class="race-stage battle-stage">
@@ -226,11 +191,10 @@
             <h2 id="playerGreeting">準備開始</h2>
             <div class="player-live-row">
               <div id="playerConnectionChip" class="player-connection-chip">CONNECTING</div>
-              <div id="playerHelperText" class="player-helper-text">正在準備控制器畫面...</div>
-            </div>
-            <div class="player-status-bar">
-              <div id="playerStatusChip" class="player-status-chip">WAITING</div>
-              <div id="playerActionChip" class="player-action-chip">等待開打</div>
+              <div id="playerStatusSummary" class="player-status-summary">
+                <strong>WAITING</strong>
+                <span>正在準備控制器畫面...</span>
+              </div>
             </div>
             <div id="playerRoundBanner" class="player-round-banner hidden">
               <strong>本局結束</strong>
@@ -258,9 +222,6 @@
                 <button id="attackButton" class="boost-button attack-button" disabled><span>⚔</span><small>攻擊</small></button>
               </div>
             </div>
-            <p id="controllerHint" class="hint-text">
-              等待房主開始亂鬥，倒數結束後立刻移動、跳躍、攻擊。
-            </p>
           </div>
         </div>
       </section>

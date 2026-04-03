@@ -124,16 +124,13 @@ const el = {
   controllerPanel: document.querySelector("#controllerPanel"),
   playerGreeting: document.querySelector("#playerGreeting"),
   playerConnectionChip: document.querySelector("#playerConnectionChip"),
-  playerHelperText: document.querySelector("#playerHelperText"),
-  playerStatusChip: document.querySelector("#playerStatusChip"),
-  playerActionChip: document.querySelector("#playerActionChip"),
+  playerStatusSummary: document.querySelector("#playerStatusSummary"),
   playerRoundBanner: document.querySelector("#playerRoundBanner"),
   playerLanePreview: document.querySelector("#playerLanePreview"),
   leftButton: document.querySelector("#leftButton"),
   rightButton: document.querySelector("#rightButton"),
   jumpButton: document.querySelector("#jumpButton"),
-  attackButton: document.querySelector("#attackButton"),
-  controllerHint: document.querySelector("#controllerHint")
+  attackButton: document.querySelector("#attackButton")
 };
 
 function iconMarkup(icon, accent) {
@@ -413,44 +410,52 @@ function updateHostUx(playerCount = appState.players.size, aliveCount = getAlive
   `;
 }
 
+function setPlayerStatusSummary(title, detail) {
+  if (!el.playerStatusSummary) return;
+  el.playerStatusSummary.innerHTML = `
+    <strong>${escapeHtml(title)}</strong>
+    <span>${escapeHtml(detail)}</span>
+  `;
+}
+
 function updatePlayerUxMeta() {
-  if (!el.playerConnectionChip || !el.playerHelperText) return;
+  if (!el.playerConnectionChip || !el.playerStatusSummary) return;
 
   const connected = Boolean(appState.hostConnection?.open);
   el.playerConnectionChip.textContent = connected ? "CONNECTED" : "RECONNECT";
   el.playerConnectionChip.classList.toggle("is-offline", !connected);
 
   if (!connected) {
-    el.playerHelperText.textContent = "和房主的連線中斷了，請重新掃碼加入。";
+    setPlayerStatusSummary("RECONNECT", "和房主的連線中斷了，請重新掃碼加入。");
     return;
   }
 
   if (appState.joinRequested) {
-    el.playerHelperText.textContent = "加入請求已送出，正在等房主同步你的角色。";
+    setPlayerStatusSummary("JOINING", "加入請求已送出，正在等房主同步你的角色。");
     return;
   }
 
   if (!appState.localPlayer) {
-    el.playerHelperText.textContent = "輸入名字、選角色後按下加入戰場。";
+    setPlayerStatusSummary("READY", "輸入名字、選角色後按下加入戰場。");
     return;
   }
 
   if (appState.gamePhase === "countdown") {
-    el.playerHelperText.textContent = `倒數 ${appState.countdownValue || ""} 中，手先放在左右和攻擊鍵上。`;
+    setPlayerStatusSummary("COUNTDOWN", `倒數 ${appState.countdownValue || ""} 中，手先放在左右和攻擊鍵上。`);
     return;
   }
 
   if (appState.gamePhase === "battle") {
-    el.playerHelperText.textContent = "長按左右持續移動，跳躍閃招，靠近後按 ATTACK。";
+    setPlayerStatusSummary("BATTLE", "長按左右持續移動，跳躍閃招，靠近後按 ATTACK。");
     return;
   }
 
   if (appState.gamePhase === "finished") {
-    el.playerHelperText.textContent = "本局結束，等房主重設就能立刻再開一場。";
+    setPlayerStatusSummary("FINISHED", "本局結束，等房主重設就能立刻再開一場。");
     return;
   }
 
-  el.playerHelperText.textContent = "已加入成功，等房主按下開始亂鬥。";
+  setPlayerStatusSummary("WAITING", "已加入成功，等房主按下開始亂鬥。");
 }
 
 function updateRoundBanner() {
@@ -1052,7 +1057,7 @@ function renderBattleArena(players) {
       <div class="battle-map-header">
         <div class="battle-map-copy">
           <strong>生日亂鬥競技場</strong>
-          <span>${reducedEffectsMode ? "超多人模式啟動中，會自動精簡特效與傷害字，優先保持戰場順暢。" : crowdedMode ? "40 人同場優化模式啟動中，介面會自動精簡，讓大場面也保持順暢。" : "移動、跳躍、揮擊，把其他人打到血條歸零。最後活著的人獲勝。"}</span>
+          <span>${reducedEffectsMode ? "超多人模式，特效會自動精簡。" : crowdedMode ? "40 人模式，介面會自動精簡。" : "同場亂鬥，活到最後獲勝。"}</span>
         </div>
         <div class="battle-chip">${alivePlayers.length} ALIVE</div>
       </div>
@@ -1356,42 +1361,32 @@ function updatePlayerStatus() {
   el.attackButton.classList.toggle("is-hit-confirm", hitAge < 420);
 
   if (appState.gamePhase === "countdown") {
-    el.controllerHint.textContent = `倒數中 ${appState.countdownValue || ""}，準備左右移動、跳躍、攻擊。`;
-    el.playerStatusChip.textContent = "COUNTDOWN";
-    el.playerActionChip.textContent = `準備 ${appState.countdownValue || ""}`;
+    setPlayerStatusSummary("COUNTDOWN", `倒數 ${appState.countdownValue || ""}，準備左右移動、跳躍、攻擊。`);
     el.leftButton.disabled = true;
     el.rightButton.disabled = true;
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else if (appState.gamePhase === "lobby") {
-    el.controllerHint.textContent = "等待房主開始亂鬥。開始後用左右移動、跳躍和攻擊把別人打下去。";
-    el.playerStatusChip.textContent = "WAITING";
-    el.playerActionChip.textContent = "等待開打";
+    setPlayerStatusSummary("WAITING", "等待房主開始亂鬥。開始後用左右移動、跳躍和攻擊把別人打下去。");
     el.leftButton.disabled = true;
     el.rightButton.disabled = true;
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else if (winner) {
-    el.controllerHint.textContent = "你是最後的倖存者！等房主重設後可以再玩一局。";
-    el.playerStatusChip.textContent = "WINNER";
-    el.playerActionChip.textContent = "你活到最後";
+    setPlayerStatusSummary("WINNER", "你是最後的倖存者，等房主重設後可以再玩一局。");
     el.leftButton.disabled = true;
     el.rightButton.disabled = true;
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else if (me.dead) {
-    el.controllerHint.textContent = "你已經被淘汰了，等房主重設下一局。";
-    el.playerStatusChip.textContent = "DEAD";
-    el.playerActionChip.textContent = "已淘汰";
+    setPlayerStatusSummary("DEAD", "你已經被淘汰了，等房主重設下一局。");
     el.leftButton.disabled = true;
     el.rightButton.disabled = true;
     el.jumpButton.disabled = true;
     el.attackButton.disabled = true;
   } else if (appState.gamePhase === "finished") {
     const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
-    el.controllerHint.textContent = `${winnerName || "有人"} 活到最後，等房主重設下一局。`;
-    el.playerStatusChip.textContent = "FINISHED";
-    el.playerActionChip.textContent = `${winnerName || "有人"} 獲勝`;
+    setPlayerStatusSummary("FINISHED", `${winnerName || "有人"} 活到最後，等房主重設下一局。`);
     el.leftButton.disabled = true;
     el.rightButton.disabled = true;
     el.jumpButton.disabled = true;
@@ -1400,13 +1395,11 @@ function updatePlayerStatus() {
     if (hitAge < 1200) {
       const targetLabel = appState.lastAttackVictim ? `命中 ${appState.lastAttackVictim}` : "命中對手";
       const damageLabel = appState.lastAttackDamage ? `，${appState.lastAttackDamage} DAMAGE` : "";
-      el.controllerHint.textContent = `${targetLabel}${damageLabel}。繼續追打。`;
-      el.playerActionChip.textContent = "HIT CONFIRM";
+      setPlayerStatusSummary("HIT CONFIRM", `${targetLabel}${damageLabel}。繼續追打。`);
     } else {
-      el.controllerHint.textContent = "左右移動搶平台，踩彈跳菇衝高點，小心掉落區，按 ATTACK 從高台伏擊更有優勢。";
-      el.playerActionChip.textContent = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
+      const shortStatus = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
+      setPlayerStatusSummary("BATTLE", `狀態 ${shortStatus}，左右移動、跳躍、攻擊。`);
     }
-    el.playerStatusChip.textContent = "BATTLE";
     el.leftButton.disabled = false;
     el.rightButton.disabled = false;
     el.jumpButton.disabled = false;
