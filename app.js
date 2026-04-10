@@ -7,6 +7,10 @@ const AIR_DRAG = 0.9;
 const STOP_SPEED = 0.06;
 const PHYSICS_FRAME = 1000 / 30;
 const STATE_SYNC_INTERVAL = 1000 / 15;
+const HOST_RENDER_INTERVAL = 50;
+const PLAYER_RENDER_INTERVAL = 50;
+const CROWDED_PLAYER_COUNT = 18;
+const REDUCED_EFFECTS_PLAYER_COUNT = 28;
 const ATTACK_RANGE = 11;
 const ATTACK_DAMAGE_MIN = 15;
 const ATTACK_DAMAGE_MAX = 28;
@@ -79,7 +83,6 @@ const appState = {
   lastAttackDamage: 0,
   lastAttackVictim: "",
   activeMoveDirection: null,
-  localMoveTimer: null,
   renderLoopStarted: false,
   needsRender: true,
   platformCacheKey: "",
@@ -87,6 +90,10 @@ const appState = {
   lastTrackMarkup: "",
   lastPreviewMarkup: "",
   lastPodiumMarkup: "",
+  lastHostNextStepMarkup: "",
+  lastPlayerStatusSummaryMarkup: "",
+  lastRoundBannerMarkup: "",
+  lastStatusText: "",
   lastRenderAt: 0,
   lastPhysicsAt: 0,
   lastStateSyncAt: 0
@@ -247,7 +254,30 @@ function escapeHtml(value) {
 }
 
 function status(text) {
+  if (appState.lastStatusText === text) return;
   el.statusBanner.textContent = text;
+  appState.lastStatusText = text;
+}
+
+function setText(target, text) {
+  if (!target) return;
+  const nextText = String(text);
+  if (target.textContent !== nextText) {
+    target.textContent = nextText;
+  }
+}
+
+function setDisabled(target, disabled) {
+  if (target && target.disabled !== disabled) {
+    target.disabled = disabled;
+  }
+}
+
+function setControlButtonsEnabled(enabled) {
+  setDisabled(el.leftButton, !enabled);
+  setDisabled(el.rightButton, !enabled);
+  setDisabled(el.jumpButton, !enabled);
+  setDisabled(el.attackButton, !enabled);
 }
 
 function maybeShowTutorial() {
@@ -291,6 +321,9 @@ function renderQrFallback(url) {
   image.alt = "加入房間 QR Code";
   image.loading = "eager";
   image.decoding = "async";
+  image.onerror = () => {
+    el.qrCode.textContent = "QR Code 載入失敗，請直接複製加入網址。";
+  };
   el.qrCode.append(image);
 }
 
@@ -404,26 +437,33 @@ function hostNextStepText(playerCount, aliveCount) {
 
 function updateHostUx(playerCount = appState.players.size, aliveCount = getAlivePlayers().length) {
   if (!el.hostNextStep) return;
-  el.hostNextStep.innerHTML = `
+  const markup = `
     <strong>下一步</strong>
     <span>${hostNextStepText(playerCount, aliveCount)}</span>
   `;
+  setMarkup(el.hostNextStep, markup, "lastHostNextStepMarkup");
 }
 
 function setPlayerStatusSummary(title, detail) {
   if (!el.playerStatusSummary) return;
-  el.playerStatusSummary.innerHTML = `
+  const markup = `
     <strong>${escapeHtml(title)}</strong>
     <span>${escapeHtml(detail)}</span>
   `;
+  setMarkup(el.playerStatusSummary, markup, "lastPlayerStatusSummaryMarkup");
+}
+
+function updatePlayerConnectionChip() {
+  if (!el.playerConnectionChip) return false;
+  const connected = Boolean(appState.hostConnection?.open);
+  setText(el.playerConnectionChip, connected ? "CONNECTED" : "RECONNECT");
+  el.playerConnectionChip.classList.toggle("is-offline", !connected);
+  return connected;
 }
 
 function updatePlayerUxMeta() {
-  if (!el.playerConnectionChip || !el.playerStatusSummary) return;
-
-  const connected = Boolean(appState.hostConnection?.open);
-  el.playerConnectionChip.textContent = connected ? "CONNECTED" : "RECONNECT";
-  el.playerConnectionChip.classList.toggle("is-offline", !connected);
+  if (!el.playerStatusSummary) return;
+  const connected = updatePlayerConnectionChip();
 
   if (!connected) {
     setPlayerStatusSummary("RECONNECT", "和房主的連線中斷了，請重新掃碼加入。");
@@ -439,23 +479,6 @@ function updatePlayerUxMeta() {
     setPlayerStatusSummary("READY", "輸入名字、選角色後按下加入戰場。");
     return;
   }
-
-  if (appState.gamePhase === "countdown") {
-    setPlayerStatusSummary("COUNTDOWN", `倒數 ${appState.countdownValue || ""} 中，手先放在左右和攻擊鍵上。`);
-    return;
-  }
-
-  if (appState.gamePhase === "battle") {
-    setPlayerStatusSummary("BATTLE", "長按左右持續移動，跳躍閃招，靠近後按 ATTACK。");
-    return;
-  }
-
-  if (appState.gamePhase === "finished") {
-    setPlayerStatusSummary("FINISHED", "本局結束，等房主重設就能立刻再開一場。");
-    return;
-  }
-
-  setPlayerStatusSummary("WAITING", "已加入成功，等房主按下開始亂鬥。");
 }
 
 function updateRoundBanner() {
@@ -463,23 +486,26 @@ function updateRoundBanner() {
   if (appState.gamePhase === "finished") {
     const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name || "本局冠軍";
     el.playerRoundBanner.classList.remove("hidden");
-    el.playerRoundBanner.innerHTML = `
+    const markup = `
       <strong>${winnerName}</strong>
       <span>本局已結束，等房主按下重設本局後再來一場。</span>
     `;
+    setMarkup(el.playerRoundBanner, markup, "lastRoundBannerMarkup");
     return;
   }
 
   if (appState.gamePhase === "countdown") {
     el.playerRoundBanner.classList.remove("hidden");
-    el.playerRoundBanner.innerHTML = `
+    const markup = `
       <strong>即將開打</strong>
       <span>倒數 ${appState.countdownValue || ""}，把手機橫著握會更好操作。</span>
     `;
+    setMarkup(el.playerRoundBanner, markup, "lastRoundBannerMarkup");
     return;
   }
 
   el.playerRoundBanner.classList.add("hidden");
+  appState.lastRoundBannerMarkup = "";
 }
 
 function combatStatusText(player, now = Date.now()) {
@@ -528,7 +554,7 @@ function getMovingPlatformOffset(now = Date.now(), deltaMs = 16.67) {
 }
 
 function getPlatformZones(now = Date.now()) {
-  const cacheKey = `${window.innerWidth >= 961 ? "desktop" : "mobile"}-${Math.floor(now / 33)}`;
+  const cacheKey = `${window.innerWidth >= 961 ? "desktop" : "mobile"}-${Math.floor(now / 50)}`;
   if (appState.platformCacheKey === cacheKey && appState.platformCache.length) {
     return appState.platformCache;
   }
@@ -912,12 +938,18 @@ function startRenderLoop() {
     advanceLocalPhysics(now);
     const shouldRender = appState.needsRender || hasLiveEffects();
 
-    if (shouldRender && now - appState.lastRenderAt >= 33 && appState.mode === "host") {
+    const renderInterval = appState.mode === "host" && appState.players.size >= CROWDED_PLAYER_COUNT
+      ? HOST_RENDER_INTERVAL + 16
+      : appState.mode === "host"
+        ? HOST_RENDER_INTERVAL
+        : PLAYER_RENDER_INTERVAL;
+
+    if (shouldRender && now - appState.lastRenderAt >= renderInterval && appState.mode === "host") {
       appState.lastRenderAt = now;
       renderBattleArena([...appState.players.values()]);
     }
 
-    if (shouldRender && now - appState.lastRenderAt >= 33 && appState.mode === "player" && appState.localPlayer) {
+    if (shouldRender && now - appState.lastRenderAt >= renderInterval && appState.mode === "player" && appState.localPlayer) {
       appState.lastRenderAt = now;
       renderPlayerPreview(appState.localPlayer);
       updatePlayerStatus();
@@ -935,8 +967,8 @@ function renderCountdownOverlay() {
     return;
   }
   el.countdownOverlay.classList.remove("hidden");
-  el.countdownNumber.textContent = appState.countdownValue;
-  el.countdownLabel.textContent = appState.countdownValue === "FIGHT!" ? "BATTLE!" : "READY";
+  setText(el.countdownNumber, appState.countdownValue);
+  setText(el.countdownLabel, appState.countdownValue === "FIGHT!" ? "BATTLE!" : "READY");
 }
 
 function setMarkup(target, markup, cacheKey) {
@@ -973,16 +1005,17 @@ function renderBattleArena(players) {
     if (Number(isAlive(b)) !== Number(isAlive(a))) return Number(isAlive(b)) - Number(isAlive(a));
     return b.hp - a.hp;
   });
-  const crowdedMode = sorted.length >= 18;
-  const reducedEffectsMode = sorted.length >= 28;
+  const crowdedMode = sorted.length >= CROWDED_PLAYER_COUNT;
+  const reducedEffectsMode = sorted.length >= REDUCED_EFFECTS_PLAYER_COUNT;
 
-  el.playerCount.textContent = String(sorted.length);
-  el.hudPlayers.textContent = String(sorted.length);
-  el.hudMode.textContent = getPhaseLabel();
-  el.hostPhase.textContent = getPhaseLabel();
+  document.body.classList.toggle("performance-mode", reducedEffectsMode);
+  setText(el.playerCount, sorted.length);
+  setText(el.hudPlayers, sorted.length);
+  setText(el.hudMode, getPhaseLabel());
+  setText(el.hostPhase, getPhaseLabel());
 
   const alivePlayers = sorted.filter(isAlive);
-  el.hostLeader.textContent = alivePlayers[0]?.name || "全滅";
+  setText(el.hostLeader, alivePlayers[0]?.name || "全滅");
   updateHostUx(sorted.length, alivePlayers.length);
 
   const damageMarkup = appState.damageBursts
@@ -1006,14 +1039,14 @@ function renderBattleArena(players) {
       </div>
     `;
     setMarkup(el.track, emptyMarkup, "lastTrackMarkup");
-    el.raceSummary.textContent = "等待玩家加入...";
-    el.startRaceButton.disabled = true;
+    setText(el.raceSummary, "等待玩家加入...");
+    setDisabled(el.startRaceButton, true);
     renderCountdownOverlay();
     renderPodium([]);
     return;
   }
 
-  el.startRaceButton.disabled = sorted.length < 2 || appState.gamePhase === "countdown";
+  setDisabled(el.startRaceButton, sorted.length < 2 || appState.gamePhase === "countdown");
 
   const fighterMarkup = sorted
     .map((player, index) => {
@@ -1072,14 +1105,14 @@ function renderBattleArena(players) {
   renderPodium(sorted);
 
   if (appState.gamePhase === "countdown") {
-    el.raceSummary.textContent = "倒數中，準備開打...";
+    setText(el.raceSummary, "倒數中，準備開打...");
   } else if (appState.gamePhase === "finished" && appState.winnerId) {
     const winner = appState.players.get(appState.winnerId);
-    el.raceSummary.textContent = `${winner?.name || "有人"} 成為最後倖存者！`;
+    setText(el.raceSummary, `${winner?.name || "有人"} 成為最後倖存者！`);
   } else if (appState.gamePhase === "battle") {
-    el.raceSummary.textContent = `場上剩 ${alivePlayers.length} 人，亂鬥進行中！`;
+    setText(el.raceSummary, `場上剩 ${alivePlayers.length} 人，亂鬥進行中！`);
   } else {
-    el.raceSummary.textContent = sorted.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始亂鬥";
+    setText(el.raceSummary, sorted.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始亂鬥");
   }
 
   renderCountdownOverlay();
@@ -1355,42 +1388,31 @@ function startBattleCountdown() {
 
 function updatePlayerStatus() {
   if (!appState.localPlayer) return;
+  const connected = updatePlayerConnectionChip();
   const me = appState.localPlayer;
   const winner = appState.winnerId ? me.id === appState.winnerId : false;
   const hitAge = Date.now() - (appState.lastAttackHitAt || 0);
   el.attackButton.classList.toggle("is-hit-confirm", hitAge < 420);
 
-  if (appState.gamePhase === "countdown") {
+  if (!connected) {
+    setPlayerStatusSummary("RECONNECT", "和房主的連線中斷了，請重新掃碼加入。");
+    setControlButtonsEnabled(false);
+  } else if (appState.gamePhase === "countdown") {
     setPlayerStatusSummary("COUNTDOWN", `倒數 ${appState.countdownValue || ""}，準備左右移動、跳躍、攻擊。`);
-    el.leftButton.disabled = true;
-    el.rightButton.disabled = true;
-    el.jumpButton.disabled = true;
-    el.attackButton.disabled = true;
+    setControlButtonsEnabled(false);
   } else if (appState.gamePhase === "lobby") {
     setPlayerStatusSummary("WAITING", "等待房主開始亂鬥。開始後用左右移動、跳躍和攻擊把別人打下去。");
-    el.leftButton.disabled = true;
-    el.rightButton.disabled = true;
-    el.jumpButton.disabled = true;
-    el.attackButton.disabled = true;
+    setControlButtonsEnabled(false);
   } else if (winner) {
     setPlayerStatusSummary("WINNER", "你是最後的倖存者，等房主重設後可以再玩一局。");
-    el.leftButton.disabled = true;
-    el.rightButton.disabled = true;
-    el.jumpButton.disabled = true;
-    el.attackButton.disabled = true;
+    setControlButtonsEnabled(false);
   } else if (me.dead) {
     setPlayerStatusSummary("DEAD", "你已經被淘汰了，等房主重設下一局。");
-    el.leftButton.disabled = true;
-    el.rightButton.disabled = true;
-    el.jumpButton.disabled = true;
-    el.attackButton.disabled = true;
+    setControlButtonsEnabled(false);
   } else if (appState.gamePhase === "finished") {
     const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
     setPlayerStatusSummary("FINISHED", `${winnerName || "有人"} 活到最後，等房主重設下一局。`);
-    el.leftButton.disabled = true;
-    el.rightButton.disabled = true;
-    el.jumpButton.disabled = true;
-    el.attackButton.disabled = true;
+    setControlButtonsEnabled(false);
   } else {
     if (hitAge < 1200) {
       const targetLabel = appState.lastAttackVictim ? `命中 ${appState.lastAttackVictim}` : "命中對手";
@@ -1400,13 +1422,9 @@ function updatePlayerStatus() {
       const shortStatus = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
       setPlayerStatusSummary("BATTLE", `狀態 ${shortStatus}，左右移動、跳躍、攻擊。`);
     }
-    el.leftButton.disabled = false;
-    el.rightButton.disabled = false;
-    el.jumpButton.disabled = false;
-    el.attackButton.disabled = false;
+    setControlButtonsEnabled(true);
   }
 
-  updatePlayerUxMeta();
   updateRoundBanner();
 }
 
@@ -1442,10 +1460,6 @@ function optimisticAttack() {
 function stopMoveHold(sendMoveStop) {
   const activeDirection = appState.activeMoveDirection;
   appState.activeMoveDirection = null;
-  if (appState.localMoveTimer) {
-    window.clearInterval(appState.localMoveTimer);
-    appState.localMoveTimer = null;
-  }
   if (activeDirection && typeof sendMoveStop === "function") {
     optimisticMoveStop(activeDirection);
     sendMoveStop(activeDirection);
@@ -1470,8 +1484,8 @@ function applyRemoteState(message) {
   appState.winnerId = message.winnerId;
   appState.gamePhase = message.gamePhase || "lobby";
   appState.countdownValue = message.countdownValue || "";
-  appState.localPlayerSnapshot = message.players;
-  const latest = message.players.find((player) => player.id === appState.playerId);
+  appState.localPlayerSnapshot = Array.isArray(message.players) ? message.players : [];
+  const latest = appState.localPlayerSnapshot.find((player) => player.id === appState.playerId);
   if (latest) {
     appState.localPlayer = latest;
     appState.needsRender = true;
@@ -1487,6 +1501,7 @@ function registerConnection(connection) {
     if (!message || typeof message !== "object") return;
 
     if (message.type === "join") {
+      if (!message.player?.id) return;
       const player = createPlayer(message.player);
       appState.players.set(player.id, player);
       appState.connections.set(player.id, connection);
@@ -1531,6 +1546,10 @@ function registerConnection(connection) {
 }
 
 function startHostMode() {
+  if (!window.Peer) {
+    status("連線套件載入失敗，請重新整理頁面。");
+    return;
+  }
   appState.mode = "host";
   el.hostView.classList.remove("hidden");
   el.playerView.classList.add("hidden");
@@ -1543,8 +1562,8 @@ function startHostMode() {
     appState.peerId = id;
     appState.joinCode = randomRoomCode(id);
     appState.joinUrl = buildJoinUrl(id);
-    el.roomCode.textContent = appState.joinCode;
-    el.joinUrl.textContent = appState.joinUrl;
+    setText(el.roomCode, appState.joinCode);
+    setText(el.joinUrl, appState.joinUrl);
     status("戰場建立成功，讓大家掃 QR Code 加入。");
     renderBattleArena([]);
     updateHostUx(0, 0);
@@ -1561,6 +1580,10 @@ function startHostMode() {
 }
 
 function startPlayerMode(hostId) {
+  if (!window.Peer) {
+    status("連線套件載入失敗，請重新整理頁面。");
+    return;
+  }
   appState.mode = "player";
   el.hostView.classList.add("hidden");
   el.playerView.classList.remove("hidden");
@@ -1577,7 +1600,7 @@ function startPlayerMode(hostId) {
 
     connection.on("open", () => {
       status("已連上房主，準備加入戰場。");
-      el.joinButton.disabled = false;
+      setDisabled(el.joinButton, false);
       updatePlayerUxMeta();
     });
 
@@ -1587,18 +1610,18 @@ function startPlayerMode(hostId) {
       if (message.type === "joined") {
         appState.joinRequested = false;
         appState.localPlayer = message.player;
-        appState.localPlayerSnapshot = message.players;
+        appState.localPlayerSnapshot = Array.isArray(message.players) ? message.players : [];
         appState.gamePhase = message.gamePhase || "lobby";
         appState.countdownValue = message.countdownValue || "";
         appState.winnerId = message.winnerId;
         el.joinPanel.classList.add("hidden");
         el.controllerPanel.classList.remove("hidden");
-        el.playerGreeting.textContent = `${message.player.name}，準備開打`;
+        setText(el.playerGreeting, `${message.player.name}，準備開打`);
         renderPlayerPreview(message.player);
         appState.lastPhysicsAt = 0;
         updatePlayerStatus();
         updatePlayerUxMeta();
-        el.joinButton.textContent = "加入戰場";
+        setText(el.joinButton, "加入戰場");
         status("加入成功，等待亂鬥開始。");
       }
 
@@ -1621,12 +1644,9 @@ function startPlayerMode(hostId) {
     connection.on("close", () => {
       appState.joinRequested = false;
       status("與房主的連線中斷了，請重新掃碼加入。");
-      el.leftButton.disabled = true;
-      el.rightButton.disabled = true;
-      el.jumpButton.disabled = true;
-      el.attackButton.disabled = true;
-      el.joinButton.disabled = true;
-      el.joinButton.textContent = "重新加入";
+      setControlButtonsEnabled(false);
+      setDisabled(el.joinButton, true);
+      setText(el.joinButton, "重新加入");
       updatePlayerUxMeta();
       updateRoundBanner();
     });
@@ -1663,15 +1683,15 @@ function wireEvents() {
     status("本局已重設，玩家可以準備下一場。");
   });
 
-  el.joinButton.disabled = true;
+  setDisabled(el.joinButton, true);
   el.joinButton.addEventListener("click", () => {
     if (appState.joinRequested || !appState.hostConnection?.open) return;
     const name = el.playerName.value.trim() || "Player";
     const avatar = getAvatarById(appState.selectedAvatarId);
     getAudioContext();
     appState.joinRequested = true;
-    el.joinButton.disabled = true;
-    el.joinButton.textContent = "加入中...";
+    setDisabled(el.joinButton, true);
+    setText(el.joinButton, "加入中...");
     appState.hostConnection.send({
       type: "join",
       player: {
@@ -1728,7 +1748,7 @@ function wireEvents() {
   };
 
   const bindMoveButton = (button, direction) => {
-    button.addEventListener("pointerdown", (event) => startMoveHold(event, direction, sendMove, sendMoveStop));
+    button.addEventListener("pointerdown", (event) => startMoveHold(event, direction, sendMove, sendMoveStop), { passive: false });
     const releaseMove = () => stopMoveHold(sendMoveStop);
     button.addEventListener("pointerup", releaseMove);
     button.addEventListener("pointercancel", releaseMove);
@@ -1739,10 +1759,14 @@ function wireEvents() {
 
   bindMoveButton(el.leftButton, "left");
   bindMoveButton(el.rightButton, "right");
-  el.jumpButton.addEventListener("pointerdown", sendJump);
-  el.attackButton.addEventListener("pointerdown", sendAttack);
+  el.jumpButton.addEventListener("pointerdown", sendJump, { passive: true });
+  el.attackButton.addEventListener("pointerdown", sendAttack, { passive: true });
   window.addEventListener("pointerup", () => stopMoveHold(sendMoveStop));
   window.addEventListener("pointercancel", () => stopMoveHold(sendMoveStop));
+  window.addEventListener("blur", () => stopMoveHold(sendMoveStop));
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopMoveHold(sendMoveStop);
+  });
 }
 
 function init() {
