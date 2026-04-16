@@ -1,1791 +1,1362 @@
-const MAX_HP = 100;
-const MAX_RUN_SPEED = 2.9;
-const GROUND_ACCEL = 0.52;
-const AIR_ACCEL = 0.34;
-const GROUND_FRICTION = 0.72;
-const AIR_DRAG = 0.9;
-const STOP_SPEED = 0.06;
-const PHYSICS_FRAME = 1000 / 30;
-const STATE_SYNC_INTERVAL = 1000 / 15;
-const HOST_RENDER_INTERVAL = 50;
-const PLAYER_RENDER_INTERVAL = 50;
-const CROWDED_PLAYER_COUNT = 18;
-const REDUCED_EFFECTS_PLAYER_COUNT = 28;
-const ATTACK_RANGE = 11;
-const ATTACK_DAMAGE_MIN = 15;
-const ATTACK_DAMAGE_MAX = 28;
-const ATTACK_COOLDOWN = 620;
-const JUMP_COOLDOWN = 680;
-const JUMP_AIR_TIME = 700;
-const HIT_STUN = 360;
-const COUNTDOWN_STEPS = ["3", "2", "1", "FIGHT!"];
-const HIDE_ZONES = [
-  { id: "left-grove", min: 13, max: 24 },
-  { id: "center-stump", min: 46, max: 56 },
-  { id: "right-shrub", min: 74, max: 85 }
-];
-const PIT_ZONES = [
-  { id: "pit-left", min: 24, max: 29, bounceX: 22.5 },
-  { id: "pit-right", min: 58, max: 64, bounceX: 66.5 }
-];
-const SPRING_ZONES = [
-  { id: "spring-left", min: 27, max: 33, launch: 980, boostX: 0.7 },
-  { id: "spring-right", min: 71, max: 77, launch: 1020, boostX: 0.8 }
-];
-const PLATFORM_ZONES = [
-  { id: "float-a", min: 14, max: 28, bottom: 176, tier: 1, perch: "蘑菇跳台" },
-  { id: "float-b", min: 68, max: 86, bottom: 214, tier: 2, perch: "高空樹台" },
-  { id: "float-c", min: 42, max: 56, bottom: 134, tier: 1, perch: "中央石橋" },
-  { id: "float-d", min: 30, max: 40, bottom: 248, tier: 3, perch: "月台瞭望點" },
-  { id: "float-e", min: 82, max: 92, bottom: 154, tier: 1, perch: "右側枝台" }
-];
-
-const avatarDefinitions = [
-  { id: "rose", name: "Crimson Warrior", colors: ["#fb6f92", "#ffd6e0", "#84233e"], icon: "hero" },
-  { id: "mint", name: "Mint Archer", colors: ["#8de5c1", "#d3fff1", "#2a6d5a"], icon: "bunny" },
-  { id: "pixel", name: "Amber Thief", colors: ["#ff9b54", "#ffe1bf", "#723b17"], icon: "fox" },
-  { id: "nova", name: "Sky Knight", colors: ["#8bb6ff", "#e2edff", "#304884"], icon: "cat" },
-  { id: "mango", name: "Moss Lancer", colors: ["#ffd166", "#fff1bf", "#8c5b13"], icon: "dino" },
-  { id: "aqua", name: "Wave Pirate", colors: ["#72ddf7", "#def8ff", "#23667a"], icon: "whale" },
-  { id: "cocoa", name: "Cocoa Boxer", colors: ["#bc8d62", "#f2dec6", "#5a3d28"], icon: "pup" },
-  { id: "violet", name: "Violet Wizard", colors: ["#be97ff", "#f1e4ff", "#52388c"], icon: "mage" },
-  { id: "pearl", name: "Sun Priest", colors: ["#ff8d72", "#ffe4cc", "#7a3d25"], icon: "chick" },
-  { id: "leaf", name: "Leaf Hunter", colors: ["#9ed36a", "#eefbd9", "#3b6f1d"], icon: "bear" },
-  { id: "ember", name: "Ember Assassin", colors: ["#ff7b5a", "#ffe1d8", "#833226"], icon: "star" },
-  { id: "glow", name: "Nova Mechanic", colors: ["#85f4ff", "#e2fdff", "#305764"], icon: "robot" }
-];
-
-const appState = {
-  mode: "host",
-  peer: null,
-  peerId: "",
-  joinCode: "",
-  hostConnection: null,
-  players: new Map(),
-  connections: new Map(),
-  selectedAvatarId: avatarDefinitions[0].id,
-  playerId: crypto.randomUUID(),
-  localPlayer: null,
-  localPlayerSnapshot: [],
-  winnerId: null,
-  joinUrl: "",
-  gamePhase: "lobby",
-  countdownValue: "",
-  countdownTimer: null,
-  audioContext: null,
-  joinRequested: false,
-  lastLocalMoveAt: 0,
-  lastLocalStepToneAt: 0,
-  lastLocalJumpAt: 0,
-  lastLocalAttackAt: 0,
-  damageBursts: [],
-  lastAttackHitAt: 0,
-  lastAttackDamage: 0,
-  lastAttackVictim: "",
-  activeMoveDirection: null,
-  renderLoopStarted: false,
-  needsRender: true,
-  platformCacheKey: "",
-  platformCache: [],
-  lastTrackMarkup: "",
-  lastPreviewMarkup: "",
-  lastPodiumMarkup: "",
-  lastHostNextStepMarkup: "",
-  lastPlayerStatusSummaryMarkup: "",
-  lastRoundBannerMarkup: "",
-  lastStatusText: "",
-  lastRenderAt: 0,
-  lastPhysicsAt: 0,
-  lastStateSyncAt: 0
+const CONFIG = {
+  maxPlayers: 50,
+  worldWidth: 100,
+  roundSeconds: 120,
+  syncMs: 66,
+  lobbyRenderMs: 250,
+  staleMs: 18_000,
+  physicsStep: 1000 / 60,
+  gravity: 0.042,
+  runAccel: 0.032,
+  maxSpeed: 0.55,
+  friction: 0.86,
+  jumpVelocity: 1.42,
+  attackRange: 7.6,
+  attackArcMs: 230,
+  attackCooldownMs: 620,
+  hitStunMs: 280,
+  inputMinMs: 45
 };
+
+const PHASE = {
+  LOBBY: "lobby",
+  COUNTDOWN: "countdown",
+  BATTLE: "battle",
+  FINISHED: "finished"
+};
+
+const AVATARS = [
+  { id: "rose", name: "Crimson Warrior", title: "烈焰劍冠", color: "#ff5f86", accent: "#ffd166", weapon: "劍" },
+  { id: "mint", name: "Mint Archer", title: "風息弓姬", color: "#4bd6a4", accent: "#d8fff0", weapon: "弓" },
+  { id: "pixel", name: "Amber Thief", title: "流光影刃", color: "#ff9f43", accent: "#fff0bf", weapon: "匕首" },
+  { id: "nova", name: "Sky Knight", title: "蒼穹騎士", color: "#6aa7ff", accent: "#e3efff", weapon: "槍" },
+  { id: "mango", name: "Moss Lancer", title: "叢林槍鋒", color: "#c4d94c", accent: "#fff6a4", weapon: "長槍" },
+  { id: "aqua", name: "Wave Pirate", title: "潮汐船長", color: "#43d7f5", accent: "#dff9ff", weapon: "彎刀" },
+  { id: "cocoa", name: "Cocoa Boxer", title: "拳風鬥士", color: "#b57a50", accent: "#ffe0c2", weapon: "拳套" },
+  { id: "violet", name: "Violet Wizard", title: "星塵法皇", color: "#a77cff", accent: "#efe2ff", weapon: "法杖" },
+  { id: "pearl", name: "Sun Priest", title: "晨曦祭司", color: "#ffbc70", accent: "#fff0d5", weapon: "聖鈴" },
+  { id: "leaf", name: "Leaf Hunter", title: "森語獵手", color: "#7bc85a", accent: "#eefbd9", weapon: "短弓" },
+  { id: "ember", name: "Ember Assassin", title: "燼火刺客", color: "#ff744f", accent: "#ffe1d8", weapon: "雙刃" },
+  { id: "glow", name: "Nova Mechanic", title: "新星機匠", color: "#77ecff", accent: "#e2fdff", weapon: "機械拳" }
+];
+
+const PLATFORMS = [
+  { id: "ground", x: 0, y: 0, w: 100, h: 8 },
+  { id: "mush-left", x: 10, y: 25, w: 22, h: 4 },
+  { id: "bridge", x: 38, y: 36, w: 24, h: 4 },
+  { id: "tree-right", x: 68, y: 29, w: 24, h: 4 },
+  { id: "high-left", x: 24, y: 53, w: 16, h: 4 },
+  { id: "high-right", x: 76, y: 49, w: 17, h: 4 }
+];
 
 const el = {
   hostView: document.querySelector("#hostView"),
   playerView: document.querySelector("#playerView"),
-  statusBanner: document.querySelector("#statusBanner"),
-  tutorialOverlay: document.querySelector("#tutorialOverlay"),
-  tutorialCloseButton: document.querySelector("#tutorialCloseButton"),
+  toast: document.querySelector("#toast"),
   qrCode: document.querySelector("#qrCode"),
   roomCode: document.querySelector("#roomCode"),
   joinUrl: document.querySelector("#joinUrl"),
   playerCount: document.querySelector("#playerCount"),
-  hudPlayers: document.querySelector("#hudPlayers"),
   hudMode: document.querySelector("#hudMode"),
+  hudAlive: document.querySelector("#hudAlive"),
+  hudTimer: document.querySelector("#hudTimer"),
   hostLeader: document.querySelector("#hostLeader"),
-  hostPhase: document.querySelector("#hostPhase"),
-  hostNextStep: document.querySelector("#hostNextStep"),
-  track: document.querySelector("#track"),
-  podium: document.querySelector("#podium"),
   raceSummary: document.querySelector("#raceSummary"),
+  playerGrid: document.querySelector("#playerGrid"),
+  lobbySummary: document.querySelector("#lobbySummary"),
+  battleFeed: document.querySelector("#battleFeed"),
+  arenaCanvas: document.querySelector("#arenaCanvas"),
   countdownOverlay: document.querySelector("#countdownOverlay"),
   countdownNumber: document.querySelector("#countdownNumber"),
   countdownLabel: document.querySelector("#countdownLabel"),
+  winnerOverlay: document.querySelector("#winnerOverlay"),
+  startGameButton: document.querySelector("#startGameButton"),
+  playAgainButton: document.querySelector("#playAgainButton"),
+  resetGameButton: document.querySelector("#resetGameButton"),
   copyLinkButton: document.querySelector("#copyLinkButton"),
-  startRaceButton: document.querySelector("#startRaceButton"),
-  resetRaceButton: document.querySelector("#resetRaceButton"),
-  avatarPicker: document.querySelector("#avatarPicker"),
-  selectedAvatarName: document.querySelector("#selectedAvatarName"),
-  playerName: document.querySelector("#playerName"),
-  joinButton: document.querySelector("#joinButton"),
+  soundToggleButton: document.querySelector("#soundToggleButton"),
+  cleanupButton: document.querySelector("#cleanupButton"),
+  maxPlayersInput: document.querySelector("#maxPlayersInput"),
+  phaseSelect: document.querySelector("#phaseSelect"),
   joinPanel: document.querySelector("#joinPanel"),
   controllerPanel: document.querySelector("#controllerPanel"),
-  playerGreeting: document.querySelector("#playerGreeting"),
+  playerName: document.querySelector("#playerName"),
+  avatarPicker: document.querySelector("#avatarPicker"),
+  selectedAvatarName: document.querySelector("#selectedAvatarName"),
+  joinButton: document.querySelector("#joinButton"),
   playerConnectionChip: document.querySelector("#playerConnectionChip"),
+  playerGreeting: document.querySelector("#playerGreeting"),
   playerStatusSummary: document.querySelector("#playerStatusSummary"),
   playerRoundBanner: document.querySelector("#playerRoundBanner"),
-  playerLanePreview: document.querySelector("#playerLanePreview"),
+  playerPreviewCanvas: document.querySelector("#playerPreviewCanvas"),
   leftButton: document.querySelector("#leftButton"),
   rightButton: document.querySelector("#rightButton"),
   jumpButton: document.querySelector("#jumpButton"),
-  attackButton: document.querySelector("#attackButton")
+  attackButton: document.querySelector("#attackButton"),
+  attackCooldown: document.querySelector("#attackCooldown")
 };
 
-function iconMarkup(icon, accent) {
-  const costumes = {
-    hero: { hair: "#8b3f25", body: accent, trim: "#f6d365", gear: "#4f6ed8", aura: "#ffd77c", cape: "#8d354d" },
-    bunny: { hair: "#f5f1ff", body: accent, trim: "#ff9fc2", gear: "#ffffff", aura: "#ffcfe3", cape: "#9d74d1" },
-    fox: { hair: accent, body: "#f7efe7", trim: "#ffd46b", gear: "#5a3424", aura: "#ffc37f", cape: "#70411f" },
-    cat: { hair: accent, body: "#fff1fb", trim: "#87a9ff", gear: "#4a3d78", aura: "#d6ddff", cape: "#5060bb" },
-    dino: { hair: "#8fd26d", body: accent, trim: "#f8f5c2", gear: "#4d7a2d", aura: "#c8f3ac", cape: "#507f37" },
-    whale: { hair: "#72ddf7", body: "#effcff", trim: accent, gear: "#2c6f8a", aura: "#a9f0ff", cape: "#2a6f8b" },
-    pup: { hair: accent, body: "#fff1e2", trim: "#f6c995", gear: "#6f4a2f", aura: "#f4d1b2", cape: "#8b4d37" },
-    mage: { hair: "#efe0ff", body: accent, trim: "#ffda7d", gear: "#52388c", aura: "#d9b8ff", cape: "#5a3ea2" },
-    chick: { hair: "#ffe97d", body: "#fff6d1", trim: accent, gear: "#cc824f", aura: "#ffe0a0", cape: "#d36f58" },
-    bear: { hair: accent, body: "#fff8ef", trim: "#8bc86a", gear: "#6b4b2d", aura: "#d8f2b4", cape: "#588947" },
-    star: { hair: "#fff8cf", body: "#fff0c5", trim: accent, gear: "#ff944d", aura: "#fff0a7", cape: "#bf5a2f" },
-    robot: { hair: "#c3f6ff", body: "#f4feff", trim: accent, gear: "#516c7d", aura: "#acefff", cape: "#5a6f88" }
-  };
+const state = {
+  mode: "host",
+  peer: null,
+  serverSocket: null,
+  serverUrl: "",
+  hostConnection: null,
+  roomId: "",
+  roomCode: "",
+  joinUrl: "",
+  phase: PHASE.LOBBY,
+  players: new Map(),
+  connections: new Map(),
+  selectedAvatarId: AVATARS[0].id,
+  localPlayerId: getOrCreateClientId(),
+  snapshot: [],
+  countdownValue: "",
+  winnerId: "",
+  feed: [],
+  sound: true,
+  maxPlayers: CONFIG.maxPlayers,
+  roundStartedAt: 0,
+  lastSyncAt: 0,
+  lastFrameAt: 0,
+  lastLobbyRenderAt: 0,
+  lastInputSentAt: 0,
+  input: { left: false, right: false },
+  audio: null,
+  dirtyLobby: true,
+  dirtyHud: true,
+  dirtyFeed: true,
+  dirtyWinner: true,
+  lastPlayerGridHtml: "",
+  lastFeedHtml: ""
+};
 
-  const costume = costumes[icon] || costumes.hero;
-  const props = {
-    hero: `<path d="M45 34h10v5H45zM50 24h4v22h-4z" fill="#d7eefb"/><path d="M47 22h10v5H47z" fill="#9dd5ef"/>`,
-    bunny: `<path d="M43 35h11v4H43zM50 27h3v14h-3z" fill="#8f5b2f"/><path d="M42 26c4-5 8-6 14-3-3 4-6 6-14 3z" fill="#e7f6d1"/>`,
-    fox: `<path d="M43 37h8v4h-8zM49 29h4v14h-4z" fill="#50586c"/><path d="M43 28h10v5H43z" fill="#f8f1d2"/>`,
-    cat: `<path d="M43 35h12v5H43z" fill="#bfd2ff"/><path d="M50 27h4v14h-4z" fill="#6b82c7"/>`,
-    dino: `<path d="M44 34h4v16h-4zM43 33h11v5H43z" fill="#d9b36f"/><path d="M49 27h4v9h-4z" fill="#9f7b41"/>`,
-    whale: `<path d="M11 35h10v4H11zM12 35h4v12h-4z" fill="#3b5f8c"/><path d="M9 30h14v5H9z" fill="#c4efff"/>`,
-    pup: `<path d="M44 36h9v4h-9z" fill="#d78655"/><path d="M46 33h5v12h-5z" fill="#7d3430"/>`,
-    mage: `<path d="M44 18h4v28h-4z" fill="#8a6cff"/><circle cx="46" cy="16" r="6" fill="#ffeb9a"/><circle cx="46" cy="16" r="2" fill="#fff"/>`,
-    chick: `<path d="M12 36h10v4H12z" fill="#f4cf7d"/><path d="M11 37h4v11h-4z" fill="#c78453"/>`,
-    bear: `<path d="M43 34h9v4h-9zM50 29h4v15h-4z" fill="#6ea44b"/><path d="M43 28h10v4h-10z" fill="#d9f1be"/>`,
-    star: `<path d="M43 35h12v4H43z" fill="#ffb26b"/><path d="M48 27h4v13h-4z" fill="#9b3b2c"/>`,
-    robot: `<path d="M43 35h12v6H43z" fill="#d4f8ff"/><path d="M48 26h4v16h-4z" fill="#6aa8bf"/><circle cx="50" cy="22" r="4" fill="#ffcf6b"/>`
-  };
-  return `
-    <ellipse cx="32" cy="58" rx="14" ry="4" fill="rgba(17,24,39,0.2)"/>
-    <path d="M20 38h6v16h-6zM38 38h6v16h-6z" fill="${costume.cape}" opacity="0.88"/>
-    <path d="M21 47h22v8H21z" fill="${costume.gear}"/>
-    <path d="M22 34h20v17H22z" fill="${costume.body}"/>
-    <path d="M24 36h16v7H24z" fill="${costume.trim}" opacity="0.92"/>
-    <path d="M24 51h6v9h-6zM34 51h6v9h-6z" fill="${costume.gear}"/>
-    <path d="M18 38h5v12h-5zM41 38h5v12h-5z" fill="${costume.body}"/>
-    <path d="M26 31h12v5H26z" fill="#fff6ea" opacity="0.72"/>
-    <circle cx="32" cy="22" r="12" fill="#ffe6cf"/>
-    <path d="M20 22c2-9 8-13 16-13 6 0 10 2 13 7l-2 10H20z" fill="${costume.hair}"/>
-    <path d="M21 23c3-4 7-6 11-6 6 0 11 2 16 8v5H21z" fill="${costume.hair}" opacity="0.92"/>
-    <path d="M26 27h3v3h-3zM35 27h3v3h-3z" fill="#2d2d2d"/>
-    <path d="M29 32h6v2h-6z" fill="#c76f6f"/>
-    <path d="M24 14h4v6h-4zM36 14h4v6h-4z" fill="${costume.trim}"/>
-    <path d="M19 17h7v4h-7zM38 17h7v4h-7z" fill="${costume.trim}" opacity="0.9"/>
-    <path d="M22 10c3 2 6 3 10 3 5 0 9-1 12-4" stroke="rgba(255,255,255,0.55)" stroke-width="2" fill="none" stroke-linecap="round"/>
-    ${props[icon] || ""}
-    <circle cx="47" cy="19" r="4" fill="${costume.aura}" opacity="0.92"/>
-    <path d="M44 18h6v2h-6zM46 16h2v6h-2z" fill="#fff"/>
-  `;
-}
+const hostCtx = el.arenaCanvas?.getContext("2d");
+const previewCtx = el.playerPreviewCanvas?.getContext("2d");
 
-function avatarSvg(avatar) {
-  const [primary, secondary, accent] = avatar.colors;
-  return `
-    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${avatar.name}" shape-rendering="crispEdges">
-      <defs>
-        <linearGradient id="bg-${avatar.id}" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="${primary}" />
-          <stop offset="100%" stop-color="${secondary}" />
-        </linearGradient>
-        <radialGradient id="shine-${avatar.id}" cx="30%" cy="22%" r="70%">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.86)" />
-          <stop offset="40%" stop-color="rgba(255,255,255,0.1)" />
-          <stop offset="100%" stop-color="rgba(255,255,255,0)" />
-        </radialGradient>
-        <linearGradient id="panel-${avatar.id}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.92)" />
-          <stop offset="100%" stop-color="rgba(255,255,255,0.14)" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="60" height="60" rx="10" fill="url(#bg-${avatar.id})" />
-      <rect x="6" y="6" width="52" height="52" rx="8" fill="url(#panel-${avatar.id})" opacity="0.55" />
-      <rect x="4" y="4" width="56" height="56" rx="9" fill="url(#shine-${avatar.id})" opacity="0.55" />
-      <circle cx="16" cy="14" r="8" fill="rgba(255,255,255,0.24)" />
-      <path d="M10 50c8-5 16-7 22-7 9 0 16 2 22 7v8H10z" fill="rgba(27,34,55,0.12)"/>
-      ${iconMarkup(avatar.icon, accent)}
-    </svg>
-  `;
-}
-
-function getAvatarById(id) {
-  return avatarDefinitions.find((avatar) => avatar.id === id) || avatarDefinitions[0];
-}
-
-function getAvatarProfile(avatarId) {
-  const avatar = getAvatarById(avatarId);
-  const profiles = {
-    rose: { title: "烈焰劍冠", attack: "#ff8a94", glow: "rgba(255, 138, 148, 0.75)", burst: "#fff0a5", sound: [280, 420] },
-    mint: { title: "風息弓姬", attack: "#8de5c1", glow: "rgba(141, 229, 193, 0.75)", burst: "#dfffea", sound: [360, 520] },
-    pixel: { title: "流光影刃", attack: "#ffb266", glow: "rgba(255, 178, 102, 0.75)", burst: "#fff2cc", sound: [300, 610] },
-    nova: { title: "蒼穹騎士", attack: "#8bb6ff", glow: "rgba(139, 182, 255, 0.75)", burst: "#e6f0ff", sound: [250, 470] },
-    mango: { title: "叢林槍鋒", attack: "#ffd166", glow: "rgba(255, 209, 102, 0.75)", burst: "#fff4c4", sound: [230, 430] },
-    aqua: { title: "潮汐船長", attack: "#72ddf7", glow: "rgba(114, 221, 247, 0.75)", burst: "#dff8ff", sound: [260, 500] },
-    cocoa: { title: "拳風鬥士", attack: "#d79a73", glow: "rgba(215, 154, 115, 0.75)", burst: "#f7e3d5", sound: [210, 360] },
-    violet: { title: "星塵法皇", attack: "#be97ff", glow: "rgba(190, 151, 255, 0.78)", burst: "#efe5ff", sound: [390, 680] },
-    pearl: { title: "晨曦祭司", attack: "#ffbe7a", glow: "rgba(255, 190, 122, 0.76)", burst: "#fff0d7", sound: [330, 560] },
-    leaf: { title: "森語獵手", attack: "#9ed36a", glow: "rgba(158, 211, 106, 0.76)", burst: "#eefbd9", sound: [270, 480] },
-    ember: { title: "燼火刺客", attack: "#ff7b5a", glow: "rgba(255, 123, 90, 0.78)", burst: "#ffe1d8", sound: [320, 640] },
-    glow: { title: "新星機匠", attack: "#85f4ff", glow: "rgba(133, 244, 255, 0.78)", burst: "#e2fdff", sound: [300, 540] }
-  };
-  return { avatar, ...(profiles[avatar.id] || profiles.rose) };
+function getOrCreateClientId() {
+  try {
+    const key = "birthday-battle-client-id";
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+    return id;
+  } catch (_error) {
+    return crypto.randomUUID();
+  }
 }
 
 function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (char) => {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => {
     const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
     return map[char];
   });
 }
 
-function status(text) {
-  if (appState.lastStatusText === text) return;
-  el.statusBanner.textContent = text;
-  appState.lastStatusText = text;
+function avatarById(id) {
+  return AVATARS.find((avatar) => avatar.id === id) || AVATARS[0];
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function setText(target, text) {
   if (!target) return;
-  const nextText = String(text);
-  if (target.textContent !== nextText) {
-    target.textContent = nextText;
-  }
+  const next = String(text);
+  if (target.textContent !== next) target.textContent = next;
 }
 
-function setDisabled(target, disabled) {
-  if (target && target.disabled !== disabled) {
-    target.disabled = disabled;
-  }
+function setVisible(target, visible) {
+  target?.classList.toggle("hidden", !visible);
 }
 
-function setControlButtonsEnabled(enabled) {
-  setDisabled(el.leftButton, !enabled);
-  setDisabled(el.rightButton, !enabled);
-  setDisabled(el.jumpButton, !enabled);
-  setDisabled(el.attackButton, !enabled);
+function setStatus(title, detail) {
+  if (!el.playerStatusSummary) return;
+  const html = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span>`;
+  if (el.playerStatusSummary.innerHTML !== html) el.playerStatusSummary.innerHTML = html;
 }
 
-function maybeShowTutorial() {
-  try {
-    if (window.localStorage.getItem("birthday-battle-tutorial") === "seen") return;
-  } catch (_error) {
-  }
-  el.tutorialOverlay?.classList.remove("hidden");
-  el.tutorialOverlay?.setAttribute("aria-hidden", "false");
+function toast(message) {
+  setText(el.toast, message);
+  el.toast?.classList.remove("hidden");
+  window.clearTimeout(toast.timer);
+  toast.timer = window.setTimeout(() => el.toast?.classList.add("hidden"), 2200);
 }
 
-function closeTutorial() {
-  el.tutorialOverlay?.classList.add("hidden");
-  el.tutorialOverlay?.setAttribute("aria-hidden", "true");
-  try {
-    window.localStorage.setItem("birthday-battle-tutorial", "seen");
-  } catch (_error) {
-  }
+function addFeed(message, tone = "info") {
+  state.feed.unshift({ id: crypto.randomUUID(), message, tone, at: Date.now() });
+  state.feed = state.feed.slice(0, 8);
+  state.dirtyFeed = true;
+}
+
+function getAudio() {
+  if (!state.sound) return null;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!state.audio) state.audio = new Ctx();
+  if (state.audio.state === "suspended") state.audio.resume();
+  return state.audio;
+}
+
+function tone(freq, dur = 0.08, type = "square", gainValue = 0.04) {
+  const ctx = getAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(gainValue, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + dur);
+}
+
+function chord(notes) {
+  notes.forEach(([freq, delay, dur]) => window.setTimeout(() => tone(freq, dur, "triangle", 0.05), delay));
+}
+
+function vibration(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
 }
 
 function buildJoinUrl(hostId) {
   const url = new URL(window.location.href);
   url.searchParams.set("join", hostId);
+  url.searchParams.delete("room");
   return url.toString();
 }
 
-function randomRoomCode(peerId) {
-  return peerId.slice(-6).toUpperCase();
+function buildServerJoinUrl(serverUrl, room) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("join");
+  url.searchParams.set("server", serverUrl);
+  url.searchParams.set("room", room);
+  return url.toString();
 }
 
-function qrServiceUrl(text, size = 220) {
-  return `https://quickchart.io/qr?text=${encodeURIComponent(text)}&size=${size}`;
+function roomCodeFromId(id) {
+  return id.slice(-6).toUpperCase();
 }
 
 function renderQrFallback(url) {
+  if (!el.qrCode) return;
   el.qrCode.innerHTML = "";
   const image = document.createElement("img");
-  image.src = qrServiceUrl(url);
-  image.width = 220;
-  image.height = 220;
-  image.alt = "加入房間 QR Code";
-  image.loading = "eager";
-  image.decoding = "async";
+  image.src = `https://quickchart.io/qr?text=${encodeURIComponent(url)}&size=260`;
+  image.alt = "Scan to join";
+  image.width = 260;
+  image.height = 260;
   image.onerror = () => {
-    el.qrCode.textContent = "QR Code 載入失敗，請直接複製加入網址。";
+    el.qrCode.textContent = "QR 載入失敗，請使用加入連結。";
   };
   el.qrCode.append(image);
 }
 
-async function renderQrCode(url) {
-  const qrApi = window.QRCode || globalThis.QRCode;
+async function renderQr(url) {
+  if (!el.qrCode) return;
   el.qrCode.innerHTML = "";
-
-  if (qrApi?.toDataURL) {
+  const qr = window.QRCode || globalThis.QRCode;
+  if (qr?.toDataURL) {
     try {
-      const dataUrl = await qrApi.toDataURL(url, { width: 220, margin: 1 });
+      const dataUrl = await qr.toDataURL(url, { width: 260, margin: 1 });
       const image = document.createElement("img");
       image.src = dataUrl;
-      image.width = 220;
-      image.height = 220;
-      image.alt = "加入房間 QR Code";
+      image.alt = "Scan to join";
+      image.width = 260;
+      image.height = 260;
       el.qrCode.append(image);
       return;
     } catch (_error) {
     }
   }
-
   renderQrFallback(url);
 }
 
-function getAudioContext() {
-  if (!window.AudioContext && !window.webkitAudioContext) return null;
-  if (!appState.audioContext) {
-    const Context = window.AudioContext || window.webkitAudioContext;
-    appState.audioContext = new Context();
-  }
-  if (appState.audioContext.state === "suspended") {
-    appState.audioContext.resume();
-  }
-  return appState.audioContext;
-}
-
-function playTone(frequency, duration, type = "square", volume = 0.05) {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = type;
-  oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-  oscillator.start();
-  oscillator.stop(ctx.currentTime + duration);
-}
-
-function playCountdownTone(step) {
-  if (step === "FIGHT!") {
-    playTone(640, 0.18, "square", 0.08);
-    setTimeout(() => playTone(920, 0.2, "square", 0.08), 100);
-    return;
-  }
-  playTone(440, 0.14, "square", 0.06);
-}
-
-function playHitTone() {
-  playTone(210, 0.08, "sawtooth", 0.07);
-  setTimeout(() => playTone(130, 0.09, "square", 0.045), 18);
-}
-
-function playAttackSwingTone(avatarId = "rose") {
-  const profile = getAvatarProfile(avatarId);
-  playTone(profile.sound[0], 0.05, "sawtooth", 0.05);
-  setTimeout(() => playTone(profile.sound[1], 0.04, "triangle", 0.035), 24);
-}
-
-function playStepTone(direction) {
-  const base = direction === "left" ? 190 : 210;
-  playTone(base, 0.028, "triangle", 0.018);
-}
-
-function playVictoryFanfare() {
-  playTone(523.25, 0.12, "square", 0.08);
-  setTimeout(() => playTone(659.25, 0.12, "square", 0.08), 120);
-  setTimeout(() => playTone(783.99, 0.2, "square", 0.08), 240);
-  setTimeout(() => playTone(1046.5, 0.24, "triangle", 0.06), 360);
-  setTimeout(() => playTone(1318.5, 0.3, "triangle", 0.045), 460);
-}
-
-function triggerMobileHitFeedback(amount = 0, targetName = "") {
-  appState.lastAttackHitAt = Date.now();
-  appState.lastAttackDamage = amount;
-  appState.lastAttackVictim = targetName;
-  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-    navigator.vibrate([40, 30, 60]);
-  }
-  appState.needsRender = true;
-  updatePlayerStatus();
-}
-
-function getPhaseLabel() {
-  if (appState.gamePhase === "countdown") return "COUNTDOWN";
-  if (appState.gamePhase === "battle") return "BATTLE";
-  if (appState.gamePhase === "finished") return "FINISH";
-  return "LOBBY";
-}
-
-function hostNextStepText(playerCount, aliveCount) {
-  if (!playerCount) return "先讓玩家掃碼加入，畫面會自動顯示目前人數。";
-  if (playerCount < 2) return "還差 1 位玩家，至少 2 人才能開始亂鬥。";
-  if (appState.gamePhase === "countdown") return "倒數進行中，大家現在可以把手機拿好準備開打。";
-  if (appState.gamePhase === "battle") return `亂鬥進行中，目前還有 ${aliveCount} 人存活。`;
-  if (appState.gamePhase === "finished") return "本局已結束，按下重設本局就能快速再玩一場。";
-  return "玩家都到齊了，按下開始亂鬥就會進入倒數。";
-}
-
-function updateHostUx(playerCount = appState.players.size, aliveCount = getAlivePlayers().length) {
-  if (!el.hostNextStep) return;
-  const markup = `
-    <strong>下一步</strong>
-    <span>${hostNextStepText(playerCount, aliveCount)}</span>
+function avatarBadge(avatar) {
+  return `
+    <span class="mini-avatar" style="--c:${avatar.color}; --a:${avatar.accent}">
+      <i></i>
+    </span>
   `;
-  setMarkup(el.hostNextStep, markup, "lastHostNextStepMarkup");
-}
-
-function setPlayerStatusSummary(title, detail) {
-  if (!el.playerStatusSummary) return;
-  const markup = `
-    <strong>${escapeHtml(title)}</strong>
-    <span>${escapeHtml(detail)}</span>
-  `;
-  setMarkup(el.playerStatusSummary, markup, "lastPlayerStatusSummaryMarkup");
-}
-
-function updatePlayerConnectionChip() {
-  if (!el.playerConnectionChip) return false;
-  const connected = Boolean(appState.hostConnection?.open);
-  setText(el.playerConnectionChip, connected ? "CONNECTED" : "RECONNECT");
-  el.playerConnectionChip.classList.toggle("is-offline", !connected);
-  return connected;
-}
-
-function updatePlayerUxMeta() {
-  if (!el.playerStatusSummary) return;
-  const connected = updatePlayerConnectionChip();
-
-  if (!connected) {
-    setPlayerStatusSummary("RECONNECT", "和房主的連線中斷了，請重新掃碼加入。");
-    return;
-  }
-
-  if (appState.joinRequested) {
-    setPlayerStatusSummary("JOINING", "加入請求已送出，正在等房主同步你的角色。");
-    return;
-  }
-
-  if (!appState.localPlayer) {
-    setPlayerStatusSummary("READY", "輸入名字、選角色後按下加入戰場。");
-    return;
-  }
-}
-
-function updateRoundBanner() {
-  if (!el.playerRoundBanner) return;
-  if (appState.gamePhase === "finished") {
-    const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name || "本局冠軍";
-    el.playerRoundBanner.classList.remove("hidden");
-    const markup = `
-      <strong>${winnerName}</strong>
-      <span>本局已結束，等房主按下重設本局後再來一場。</span>
-    `;
-    setMarkup(el.playerRoundBanner, markup, "lastRoundBannerMarkup");
-    return;
-  }
-
-  if (appState.gamePhase === "countdown") {
-    el.playerRoundBanner.classList.remove("hidden");
-    const markup = `
-      <strong>即將開打</strong>
-      <span>倒數 ${appState.countdownValue || ""}，把手機橫著握會更好操作。</span>
-    `;
-    setMarkup(el.playerRoundBanner, markup, "lastRoundBannerMarkup");
-    return;
-  }
-
-  el.playerRoundBanner.classList.add("hidden");
-  appState.lastRoundBannerMarkup = "";
-}
-
-function combatStatusText(player, now = Date.now()) {
-  if (!player || player.dead) return "OUT";
-  if ((player.attackingUntil || 0) > now) return "SLASH";
-  if ((player.hitUntil || 0) > now) return "HIT";
-  if ((player.airborneUntil || 0) > now) return "JUMP";
-  if (now - (player.lastSpringAt || 0) < 280) return "BOOST";
-  if (getPerchLabel(player, now)) return "PERCH";
-  if (isInHideZone(player, now)) return "HIDE";
-  return "READY";
-}
-
-function isAirborne(player, now = Date.now()) {
-  return (player.airborneUntil || 0) > now;
-}
-
-function isAlive(player) {
-  return !player.dead && player.hp > 0;
-}
-
-function getMovingPlatformZone(now = Date.now()) {
-  const desktop = window.innerWidth >= 961;
-  const center = desktop ? 56 : 54;
-  const drift = Math.sin(now / 900) * (desktop ? 10 : 8);
-  const width = desktop ? 11 : 10;
-  const min = center + drift - width / 2;
-  const max = center + drift + width / 2;
-  return {
-    id: "float-move",
-    min,
-    max,
-    bottom: desktop ? 214 : 182,
-    tier: 2,
-    perch: "巡航浮台",
-    style: `left:${min}%; width:${max - min}%; bottom:${desktop ? 214 : 182}px;`
-  };
-}
-
-function getMovingPlatformOffset(now = Date.now(), deltaMs = 16.67) {
-  const current = getMovingPlatformZone(now);
-  const previous = getMovingPlatformZone(now - deltaMs);
-  const currentCenter = (current.min + current.max) / 2;
-  const previousCenter = (previous.min + previous.max) / 2;
-  return currentCenter - previousCenter;
-}
-
-function getPlatformZones(now = Date.now()) {
-  const cacheKey = `${window.innerWidth >= 961 ? "desktop" : "mobile"}-${Math.floor(now / 50)}`;
-  if (appState.platformCacheKey === cacheKey && appState.platformCache.length) {
-    return appState.platformCache;
-  }
-
-  let zones;
-  if (window.innerWidth >= 961) {
-    zones = [
-      { id: "float-a", min: 14, max: 29, bottom: 194, tier: 1, perch: "蘑菇跳台" },
-      { id: "float-b", min: 66, max: 86, bottom: 242, tier: 2, perch: "高空樹台" },
-      { id: "float-c", min: 42, max: 56, bottom: 152, tier: 1, perch: "中央石橋" },
-      { id: "float-d", min: 29, max: 41, bottom: 286, tier: 3, perch: "月台瞭望點" },
-      { id: "float-e", min: 82, max: 93, bottom: 176, tier: 1, perch: "右側枝台" },
-      getMovingPlatformZone(now)
-    ];
-  } else {
-    zones = [...PLATFORM_ZONES, getMovingPlatformZone(now)];
-  }
-  appState.platformCacheKey = cacheKey;
-  appState.platformCache = zones;
-  return zones;
-}
-
-function getPlatformZoneForX(x, now = Date.now()) {
-  return getPlatformZones(now).find((zone) => x >= zone.min && x <= zone.max) || null;
-}
-
-function getPlayerPlatformZone(player, now = Date.now()) {
-  if (!player || player.dead) return null;
-  const zoneAtPosition = getPlatformZoneForX(player.x, now);
-  if (isAirborne(player, now)) {
-    if (zoneAtPosition) {
-      player.platformZoneId = zoneAtPosition.id;
-      return zoneAtPosition;
-    }
-    return null;
-  }
-
-  if (player.platformZoneId) {
-    const lockedZone = getPlatformZones(now).find((zone) => zone.id === player.platformZoneId);
-    if (lockedZone && player.x >= lockedZone.min && player.x <= lockedZone.max) {
-      return lockedZone;
-    }
-  }
-
-  if (zoneAtPosition) {
-    player.platformZoneId = zoneAtPosition.id;
-    return zoneAtPosition;
-  }
-
-  player.platformZoneId = null;
-  return null;
-}
-
-function playerBottom(player, index, now = Date.now()) {
-  const laneOffset = 72 + (index % 6) * 14;
-  const platformZone = getPlayerPlatformZone(player, now);
-  const baseBottom = platformZone ? platformZone.bottom : laneOffset;
-  const jumpLift = isAirborne(player, now) ? 42 : 0;
-  return baseBottom + jumpLift;
-}
-
-function previewPlayerBottom(player, now = Date.now()) {
-  return Math.round(playerBottom(player, 0, now) * 0.72);
-}
-
-function getPlayerTier(player, now = Date.now()) {
-  const zone = getPlayerPlatformZone(player, now);
-  return zone?.tier || 0;
-}
-
-function isSameCombatLayer(attacker, target, now = Date.now()) {
-  if (isAirborne(attacker, now) || isAirborne(target, now)) return true;
-  return Math.abs(playerBottom(attacker, 0, now) - playerBottom(target, 0, now)) <= 32;
-}
-
-function getPerchLabel(player, now = Date.now()) {
-  if (!player || player.dead || isAirborne(player, now)) return "";
-  return getPlayerPlatformZone(player, now)?.perch || "";
-}
-
-function getPitZoneForX(x) {
-  return PIT_ZONES.find((zone) => x >= zone.min && x <= zone.max) || null;
-}
-
-function getSpringZoneForX(x) {
-  return SPRING_ZONES.find((zone) => x >= zone.min && x <= zone.max) || null;
 }
 
 function setupAvatarPicker() {
-  el.avatarPicker.innerHTML = avatarDefinitions
-    .map((avatar) => {
-      const selectedClass = avatar.id === appState.selectedAvatarId ? "selected" : "";
-      return `
-        <button class="avatar-option ${selectedClass}" type="button" data-avatar="${avatar.id}">
-          <div class="avatar-badge">${avatarSvg(avatar)}</div>
-          <span>${escapeHtml(avatar.name)}</span>
-        </button>
-      `;
-    })
-    .join("");
-
-  el.selectedAvatarName.textContent = getAvatarById(appState.selectedAvatarId).name;
-
+  if (!el.avatarPicker) return;
+  el.avatarPicker.innerHTML = AVATARS.map((avatar) => `
+    <button class="avatar-option ${avatar.id === state.selectedAvatarId ? "selected" : ""}" data-avatar="${avatar.id}" type="button">
+      ${avatarBadge(avatar)}
+      <strong>${escapeHtml(avatar.name)}</strong>
+      <span>${escapeHtml(avatar.weapon)}</span>
+    </button>
+  `).join("");
+  setText(el.selectedAvatarName, avatarById(state.selectedAvatarId).name);
   el.avatarPicker.querySelectorAll("[data-avatar]").forEach((button) => {
     button.addEventListener("click", () => {
-      appState.selectedAvatarId = button.dataset.avatar;
+      state.selectedAvatarId = button.dataset.avatar;
       setupAvatarPicker();
     });
   });
 }
 
-function arenaDecorations() {
-  const movingPlatform = getMovingPlatformZone();
-  return `
-    <div class="battle-backdrop">
-      <div class="battle-layer battle-sky"></div>
-      <div class="battle-layer battle-clouds"></div>
-      <div class="battle-layer battle-hills"></div>
-      <div class="battle-layer battle-waterfall"></div>
-      <div class="battle-layer battle-village"></div>
-      <div class="battle-layer battle-ruins"></div>
-      <div class="battle-layer battle-crystals"></div>
-      <div class="battle-layer battle-trees"></div>
-      <div class="battle-layer battle-flowers"></div>
-      <div class="battle-platform ground"></div>
-      <div class="battle-platform float-a"></div>
-      <div class="battle-platform float-b"></div>
-      <div class="battle-platform float-c"></div>
-      <div class="battle-platform float-d"></div>
-      <div class="battle-platform float-e"></div>
-      <div class="battle-platform float-move" style="${movingPlatform.style}"></div>
-      <div class="battle-pit pit-left"></div>
-      <div class="battle-pit pit-right"></div>
-      <div class="arena-totem left"></div>
-      <div class="arena-totem right"></div>
-      <div class="arena-gate"></div>
-    </div>
-  `;
-}
-
-function arenaForegroundDecorations() {
-  return `
-    <div class="battle-foreground">
-      <div class="hide-spot left-grove"></div>
-      <div class="hide-spot center-stump"></div>
-      <div class="hide-spot right-shrub"></div>
-      <div class="foreground-mushroom mush-a"></div>
-      <div class="foreground-mushroom mush-b"></div>
-      <div class="foreground-lamp lamp-a"></div>
-      <div class="foreground-lamp lamp-b"></div>
-      <div class="spring-pad spring-left"></div>
-      <div class="spring-pad spring-right"></div>
-      <div class="sky-bush perch-left"></div>
-      <div class="sky-bush perch-right"></div>
-    </div>
-  `;
-}
-
-function clampX(x) {
-  return Math.max(6, Math.min(94, x));
-}
-
-function getHideZoneForX(x) {
-  return HIDE_ZONES.find((zone) => x >= zone.min && x <= zone.max) || null;
-}
-
-function isInHideZone(player, now = Date.now()) {
-  if (!player || player.dead || isAirborne(player, now)) return false;
-  return Boolean(getHideZoneForX(player.x));
-}
-
-function sameHideZone(attacker, target) {
-  const attackerZone = getHideZoneForX(attacker.x);
-  const targetZone = getHideZoneForX(target.x);
-  return attackerZone && targetZone && attackerZone.id === targetZone.id;
-}
-
-function movementIntent(direction) {
-  return direction === "left" ? -1 : 1;
-}
-
-function setPlayerMoveIntent(player, direction) {
-  if (!player || player.dead) return false;
-  const nextIntent = direction ? movementIntent(direction) : 0;
-  const previousIntent = player.moveIntent || 0;
-  if (nextIntent && player.direction !== direction) {
-    player.direction = direction;
-  }
-  player.moveIntent = nextIntent;
-  return previousIntent !== nextIntent;
-}
-
-function releasePlayerMoveIntent(player, direction = null) {
-  if (!player) return false;
-  if (!direction) {
-    const changed = Boolean(player.moveIntent);
-    player.moveIntent = 0;
-    return changed;
-  }
-  const intended = movementIntent(direction);
-  if ((player.moveIntent || 0) !== intended) return false;
-  player.moveIntent = 0;
-  return true;
-}
-
-function stepPlayerMotion(player, deltaScale, now = Date.now()) {
-  if (!player) return false;
-  const previousX = player.x;
-  const previousVelocity = player.velocityX || 0;
-  const previousDirection = player.direction;
-
-  if (player.dead || appState.gamePhase !== "battle") {
-    player.moveIntent = 0;
-    player.velocityX = 0;
-    player.platformZoneId = null;
-    return previousVelocity !== 0;
-  }
-
-  const airborne = isAirborne(player, now);
-  const stunned = now < (player.hitUntil || 0);
-  const intent = stunned ? 0 : (player.moveIntent || 0);
-  const currentZone = getPlayerPlatformZone(player, now);
-  const targetVelocity = intent * MAX_RUN_SPEED;
-  const acceleration = (airborne ? AIR_ACCEL : GROUND_ACCEL) * deltaScale;
-
-  if (intent !== 0) {
-    const velocityDelta = targetVelocity - (player.velocityX || 0);
-    player.velocityX = (player.velocityX || 0) + Math.sign(velocityDelta) * Math.min(Math.abs(velocityDelta), acceleration);
-    player.direction = intent < 0 ? "left" : "right";
-  } else {
-    player.velocityX = (player.velocityX || 0) * Math.pow(airborne ? AIR_DRAG : GROUND_FRICTION, deltaScale);
-    if (Math.abs(player.velocityX) < STOP_SPEED) {
-      player.velocityX = 0;
-    }
-  }
-
-  const nextX = clampX(player.x + (player.velocityX || 0) * deltaScale);
-  if (nextX === 6 || nextX === 94) {
-    player.velocityX = 0;
-  }
-  player.x = nextX;
-  if (!airborne && currentZone?.id === "float-move") {
-    player.x = clampX(player.x + getMovingPlatformOffset(now, 16.67 * deltaScale));
-  }
-  getPlayerPlatformZone(player, now);
-
-  return Math.abs(player.x - previousX) > 0.01 || Math.abs((player.velocityX || 0) - previousVelocity) > 0.01 || previousDirection !== player.direction;
-}
-
-function applyArenaTriggers(player, now = Date.now()) {
-  if (!player || player.dead || appState.gamePhase !== "battle") return false;
-  const grounded = !isAirborne(player, now);
-  const tier = getPlayerTier(player, now);
-  let changed = false;
-
-  if (grounded && tier === 0) {
-    const pitZone = getPitZoneForX(player.x);
-    if (pitZone && now - (player.lastPitAt || 0) > 1200) {
-      player.lastPitAt = now;
-      player.platformZoneId = null;
-      player.hp = Math.max(0, player.hp - 18);
-      player.hitUntil = now + 260;
-      player.airborneUntil = now + 760;
-      player.x = clampX(pitZone.bounceX);
-      player.velocityX = player.x < 50 ? 1.4 : -1.4;
-      addDamageBurst(player.x, 18, false, player.avatarId);
-      changed = true;
-      if (player.hp <= 0) {
-        player.dead = true;
-        player.airborneUntil = 0;
-        player.attackingUntil = 0;
-        player.velocityX = 0;
-      }
-    }
-
-    const springZone = getSpringZoneForX(player.x);
-    if (!player.dead && springZone && now - (player.lastSpringAt || 0) > 900) {
-      player.lastSpringAt = now;
-      player.platformZoneId = null;
-      player.airborneUntil = now + springZone.launch;
-      player.velocityX = (player.velocityX || 0) + (player.direction === "right" ? springZone.boostX : -springZone.boostX);
-      changed = true;
-    }
-  }
-
-  return changed;
-}
-
-function advanceArenaPhysics(now) {
-  if (appState.mode !== "host") return;
-  if (!appState.lastPhysicsAt) {
-    appState.lastPhysicsAt = now;
-    return;
-  }
-
-  const elapsed = now - appState.lastPhysicsAt;
-  if (elapsed < PHYSICS_FRAME) return;
-  const deltaScale = Math.min(2.2, Math.max(0.8, elapsed / 16.67));
-  appState.lastPhysicsAt = now;
-
-  let changed = false;
-  appState.players.forEach((player) => {
-    changed = stepPlayerMotion(player, deltaScale, now) || changed;
-    changed = applyArenaTriggers(player, now) || changed;
-  });
-
-  if (!changed) return;
-  appState.needsRender = true;
-
-  if (now - appState.lastStateSyncAt >= STATE_SYNC_INTERVAL) {
-    appState.lastStateSyncAt = now;
-    broadcastState();
-  }
-}
-
-function advanceLocalPhysics(now) {
-  if (appState.mode !== "player" || !appState.localPlayer) return;
-  if (!appState.lastPhysicsAt) {
-    appState.lastPhysicsAt = now;
-    return;
-  }
-
-  const elapsed = now - appState.lastPhysicsAt;
-  if (elapsed < PHYSICS_FRAME) return;
-  const deltaScale = Math.min(2.2, Math.max(0.8, elapsed / 16.67));
-  appState.lastPhysicsAt = now;
-
-  if (stepPlayerMotion(appState.localPlayer, deltaScale, now)) {
-    appState.needsRender = true;
-  }
-  if (applyArenaTriggers(appState.localPlayer, now)) {
-    appState.needsRender = true;
-  }
-}
-
-function addDamageBurst(x, amount, crit = false, avatarId = "rose") {
-  appState.damageBursts.push({
-    id: crypto.randomUUID(),
-    x,
-    amount,
-    crit,
-    avatarId,
-    createdAt: Date.now()
-  });
-  if (appState.damageBursts.length > 10) {
-    appState.damageBursts = appState.damageBursts.slice(-10);
-  }
-  appState.needsRender = true;
-}
-
-function pruneDamageBursts() {
-  const now = Date.now();
-  appState.damageBursts = appState.damageBursts.filter((burst) => now - burst.createdAt < 820);
-}
-
-function hasLiveEffects() {
-  const now = Date.now();
-  if (appState.gamePhase === "battle") return true;
-  if (appState.damageBursts.length) return true;
-  for (const player of appState.players.values()) {
-    if ((player.airborneUntil || 0) > now) return true;
-    if ((player.attackingUntil || 0) > now) return true;
-    if ((player.hitUntil || 0) > now) return true;
-  }
-  if (appState.localPlayer) {
-    if ((appState.localPlayer.airborneUntil || 0) > now) return true;
-    if ((appState.localPlayer.attackingUntil || 0) > now) return true;
-    if ((appState.localPlayer.hitUntil || 0) > now) return true;
-  }
-  return false;
-}
-
-function startRenderLoop() {
-  if (appState.renderLoopStarted) return;
-  appState.renderLoopStarted = true;
-
-  const tick = () => {
-    const now = Date.now();
-    pruneDamageBursts();
-    advanceArenaPhysics(now);
-    advanceLocalPhysics(now);
-    const shouldRender = appState.needsRender || hasLiveEffects();
-
-    const renderInterval = appState.mode === "host" && appState.players.size >= CROWDED_PLAYER_COUNT
-      ? HOST_RENDER_INTERVAL + 16
-      : appState.mode === "host"
-        ? HOST_RENDER_INTERVAL
-        : PLAYER_RENDER_INTERVAL;
-
-    if (shouldRender && now - appState.lastRenderAt >= renderInterval && appState.mode === "host") {
-      appState.lastRenderAt = now;
-      renderBattleArena([...appState.players.values()]);
-    }
-
-    if (shouldRender && now - appState.lastRenderAt >= renderInterval && appState.mode === "player" && appState.localPlayer) {
-      appState.lastRenderAt = now;
-      renderPlayerPreview(appState.localPlayer);
-      updatePlayerStatus();
-    }
-
-    window.requestAnimationFrame(tick);
-  };
-
-  window.requestAnimationFrame(tick);
-}
-
-function renderCountdownOverlay() {
-  if (appState.gamePhase !== "countdown" || !appState.countdownValue) {
-    el.countdownOverlay.classList.add("hidden");
-    return;
-  }
-  el.countdownOverlay.classList.remove("hidden");
-  setText(el.countdownNumber, appState.countdownValue);
-  setText(el.countdownLabel, appState.countdownValue === "FIGHT!" ? "BATTLE!" : "READY");
-}
-
-function setMarkup(target, markup, cacheKey) {
-  if (!target) return;
-  if (appState[cacheKey] === markup) return;
-  target.innerHTML = markup;
-  appState[cacheKey] = markup;
-}
-
-function renderPodium(players) {
-  const markup = players
-    .slice(0, 4)
-    .map((player, index) => {
-      const avatar = getAvatarById(player.avatarId);
-      const label = isAlive(player) ? `${player.hp} HP` : "淘汰";
-      return `
-        <div class="podium-card" data-rank="${index + 1}">
-          <div class="avatar-badge">${avatarSvg(avatar)}</div>
-          <div>
-            <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
-            <span>${label}</span>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-  setMarkup(el.podium, markup, "lastPodiumMarkup");
-}
-
-function renderBattleArena(players) {
-  appState.needsRender = false;
-  const now = Date.now();
-  const sorted = [...players].sort((a, b) => {
-    if (Number(isAlive(b)) !== Number(isAlive(a))) return Number(isAlive(b)) - Number(isAlive(a));
-    return b.hp - a.hp;
-  });
-  const crowdedMode = sorted.length >= CROWDED_PLAYER_COUNT;
-  const reducedEffectsMode = sorted.length >= REDUCED_EFFECTS_PLAYER_COUNT;
-
-  document.body.classList.toggle("performance-mode", reducedEffectsMode);
-  setText(el.playerCount, sorted.length);
-  setText(el.hudPlayers, sorted.length);
-  setText(el.hudMode, getPhaseLabel());
-  setText(el.hostPhase, getPhaseLabel());
-
-  const alivePlayers = sorted.filter(isAlive);
-  setText(el.hostLeader, alivePlayers[0]?.name || "全滅");
-  updateHostUx(sorted.length, alivePlayers.length);
-
-  const damageMarkup = appState.damageBursts
-    .slice(reducedEffectsMode ? -4 : -10)
-    .map((burst) => {
-      const profile = getAvatarProfile(burst.avatarId);
-      return `
-        <div class="damage-burst ${burst.crit ? "crit" : ""}" style="left:${burst.x}%; --burst-main:${profile.attack}; --burst-glow:${profile.glow}; --burst-text:${profile.burst}">-${burst.amount}</div>
-      `;
-    })
-    .join("");
-
-  if (!sorted.length) {
-    const emptyMarkup = `
-      <div class="battle-map">
-        ${arenaDecorations()}
-        <div class="battle-map-copy">
-          <strong>等待玩家加入</strong>
-          <span>掃描 QR Code 加入戰場，倒數後開始大亂鬥。</span>
-        </div>
-      </div>
-    `;
-    setMarkup(el.track, emptyMarkup, "lastTrackMarkup");
-    setText(el.raceSummary, "等待玩家加入...");
-    setDisabled(el.startRaceButton, true);
-    renderCountdownOverlay();
-    renderPodium([]);
-    return;
-  }
-
-  setDisabled(el.startRaceButton, sorted.length < 2 || appState.gamePhase === "countdown");
-
-  const fighterMarkup = sorted
-    .map((player, index) => {
-      const avatar = getAvatarById(player.avatarId);
-      const profile = getAvatarProfile(player.avatarId);
-      const groundedBottom = playerBottom(player, index);
-      const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
-      const fighterClass = [
-        "battle-fighter",
-        crowdedMode ? "is-compact" : "",
-        isInHideZone(player) ? "is-hidden-cover" : "",
-        Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
-        player.dead ? "is-dead" : "",
-        isAirborne(player, now) ? "is-jumping" : "",
-        (player.attackingUntil || 0) > now ? "is-attacking" : "",
-        (player.hitUntil || 0) > now ? "is-hit" : "",
-        player.direction === "left" ? "face-left" : ""
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-      return `
-        <div class="${fighterClass}" style="left:${player.x}%; bottom:${groundedBottom}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
-          <div class="fighter-name">${escapeHtml(crowdedMode ? player.name.slice(0, 8) : player.name)}</div>
-          <div class="fighter-hp-bar">
-            <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
-          </div>
-          <div class="fighter-meta">${Math.max(0, player.hp)}${crowdedMode ? "" : " HP"}</div>
-          <div class="runner-avatar">${avatarSvg(avatar)}</div>
-          <div class="fighter-status">${combatStatusText(player, now)}</div>
-          ${(player.attackingUntil || 0) > now && !player.dead && !crowdedMode && !reducedEffectsMode ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
-          ${(player.hitUntil || 0) > now && !player.dead && !crowdedMode && !reducedEffectsMode ? `<div class="hit-spark"></div>` : ""}
-        </div>
-      `;
-    })
-    .join("");
-
-  const trackMarkup = `
-    <div class="battle-map">
-      ${arenaDecorations()}
-      <div class="battle-map-header">
-        <div class="battle-map-copy">
-          <strong>生日亂鬥競技場</strong>
-          <span>${reducedEffectsMode ? "超多人模式，特效會自動精簡。" : crowdedMode ? "40 人模式，介面會自動精簡。" : "同場亂鬥，活到最後獲勝。"}</span>
-        </div>
-        <div class="battle-chip">${alivePlayers.length} ALIVE</div>
-      </div>
-      ${fighterMarkup}
-      ${arenaForegroundDecorations()}
-      ${damageMarkup}
-      ${appState.gamePhase === "finished" && appState.winnerId ? renderWinnerShowcase() : ""}
-    </div>
-  `;
-  setMarkup(el.track, trackMarkup, "lastTrackMarkup");
-
-  renderPodium(sorted);
-
-  if (appState.gamePhase === "countdown") {
-    setText(el.raceSummary, "倒數中，準備開打...");
-  } else if (appState.gamePhase === "finished" && appState.winnerId) {
-    const winner = appState.players.get(appState.winnerId);
-    setText(el.raceSummary, `${winner?.name || "有人"} 成為最後倖存者！`);
-  } else if (appState.gamePhase === "battle") {
-    setText(el.raceSummary, `場上剩 ${alivePlayers.length} 人，亂鬥進行中！`);
-  } else {
-    setText(el.raceSummary, sorted.length < 2 ? "至少要 2 位玩家才能開始" : "玩家已就位，按下開始亂鬥");
-  }
-
-  renderCountdownOverlay();
-}
-
-function renderPlayerPreview(player = appState.localPlayer) {
-  if (!player) return;
-  appState.needsRender = false;
-  const now = Date.now();
-  const avatar = getAvatarById(player.avatarId);
-  const profile = getAvatarProfile(player.avatarId);
-  const previewBottom = previewPlayerBottom(player);
-  const healthPercent = Math.max(0, Math.round((player.hp / MAX_HP) * 100));
-  const fighterClass = [
-    "battle-fighter",
-    Math.abs(player.velocityX || 0) > 0.35 ? "is-running" : "",
-    player.dead ? "is-dead" : "",
-    isAirborne(player, now) ? "is-jumping" : "",
-    (player.attackingUntil || 0) > now ? "is-attacking" : "",
-    (player.hitUntil || 0) > now ? "is-hit" : "",
-    player.direction === "left" ? "face-left" : ""
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const previewMarkup = `
-    <div class="battle-map preview-map">
-      ${arenaDecorations()}
-      <div class="${fighterClass} preview-fighter" style="left:${player.x}%; bottom:${previewBottom}px; --attack-main:${profile.attack}; --attack-glow:${profile.glow}">
-        <div class="fighter-name">${escapeHtml(player.name)}</div>
-        <div class="fighter-hp-bar">
-          <div class="fighter-hp-fill" style="width:${healthPercent}%"></div>
-        </div>
-        <div class="fighter-meta">${Math.max(0, player.hp)} HP</div>
-        <div class="runner-avatar">${avatarSvg(avatar)}</div>
-        <div class="fighter-status">${combatStatusText(player, now)}</div>
-        ${(player.attackingUntil || 0) > now && !player.dead ? `<div class="attack-arc ${player.direction === "left" ? "left" : "right"}"></div>` : ""}
-        ${(player.hitUntil || 0) > now && !player.dead ? `<div class="hit-spark"></div>` : ""}
-      </div>
-      ${arenaForegroundDecorations()}
-    </div>
-  `;
-  setMarkup(el.playerLanePreview, previewMarkup, "lastPreviewMarkup");
-}
-
-function renderWinnerShowcase() {
-  const winner = appState.players.get(appState.winnerId);
-  if (!winner) return "";
-  const profile = getAvatarProfile(winner.avatarId);
-  const particles = Array.from({ length: 14 }, (_, index) => {
-    const left = 12 + (index % 7) * 12 + (index >= 7 ? 4 : 0);
-    const delay = (index % 7) * 70;
-    const size = index % 3 === 0 ? "lg" : index % 2 === 0 ? "md" : "sm";
-    return `<span class="winner-particle ${size}" style="left:${left}%; animation-delay:${delay}ms"></span>`;
-  }).join("");
-  return `
-    <div class="winner-showcase">
-      <div class="winner-particles" style="--winner-main:${profile.attack}; --winner-glow:${profile.glow}">${particles}</div>
-      <div class="winner-card" style="--winner-main:${profile.attack}; --winner-glow:${profile.glow}">
-        <div class="winner-badge">WINNER</div>
-        <div class="winner-avatar">${avatarSvg(profile.avatar)}</div>
-        <strong>${escapeHtml(winner.name)}</strong>
-        <span>${profile.title}</span>
-      </div>
-    </div>
-  `;
-}
-
-function sendToAll(message) {
-  appState.connections.forEach((connection) => {
-    if (connection.open) {
-      connection.send(message);
-    }
-  });
-}
-
-function broadcastState() {
-  pruneDamageBursts();
-  appState.needsRender = true;
-  const payload = {
-    type: "state",
-    winnerId: appState.winnerId,
-    gamePhase: appState.gamePhase,
-    countdownValue: appState.countdownValue,
-    players: [...appState.players.values()]
-  };
-  sendToAll(payload);
-}
-
-function createPlayer(messagePlayer) {
+function createPlayer(payload, connection) {
+  const avatar = avatarById(payload.avatarId);
+  const index = state.players.size;
   return {
-    id: messagePlayer.id,
-    name: messagePlayer.name.slice(0, 16) || "Player",
-    avatarId: messagePlayer.avatarId,
-    x: 18 + Math.random() * 64,
-    hp: MAX_HP,
+    id: payload.id,
+    name: String(payload.name || "Player").slice(0, 16),
+    avatarId: avatar.id,
+    x: 10 + (index % 10) * 8.5,
+    y: 8,
+    vx: 0,
+    vy: 0,
+    dir: index % 2 ? -1 : 1,
+    hp: 100,
     dead: false,
-    direction: Math.random() > 0.5 ? "right" : "left",
-    joinedAt: Date.now(),
-    airborneUntil: 0,
-    attackingUntil: 0,
+    ready: true,
+    connected: Boolean(connection?.open),
+    lastSeen: Date.now(),
+    input: { left: false, right: false },
+    attackUntil: 0,
     hitUntil: 0,
-    moveIntent: 0,
-    platformZoneId: null,
-    velocityX: 0,
-    lastJumpAt: 0,
     lastAttackAt: 0,
-    lastPitAt: 0,
-    lastSpringAt: 0
+    lastJumpAt: 0,
+    stats: { hits: 0, eliminations: 0, damage: 0, survivedMs: 0 }
   };
 }
 
-function resetBattle() {
-  clearTimeout(appState.countdownTimer);
-  appState.countdownTimer = null;
-  appState.winnerId = null;
-  appState.gamePhase = "lobby";
-  appState.countdownValue = "";
-  appState.damageBursts = [];
-  const players = [...appState.players.values()];
-  players.forEach((player, index) => {
-    player.hp = MAX_HP;
-    player.dead = false;
-    player.x = 14 + index * (68 / Math.max(1, players.length - 1 || 1));
-    player.direction = index % 2 ? "left" : "right";
-    player.airborneUntil = 0;
-    player.attackingUntil = 0;
-    player.hitUntil = 0;
-    player.moveIntent = 0;
-    player.platformZoneId = null;
-    player.velocityX = 0;
-    player.lastJumpAt = 0;
-    player.lastAttackAt = 0;
-    player.lastPitAt = 0;
-    player.lastSpringAt = 0;
-  });
-  appState.lastPhysicsAt = 0;
-  appState.lastStateSyncAt = 0;
-  broadcastState();
+function compactPlayer(player) {
+  return {
+    id: player.id,
+    n: player.name,
+    a: player.avatarId,
+    x: Number(player.x.toFixed(2)),
+    y: Number(player.y.toFixed(2)),
+    h: player.hp,
+    d: player.dir,
+    dead: player.dead,
+    c: player.connected,
+    atk: player.attackUntil,
+    hit: player.hitUntil,
+    r: player.ready,
+    s: player.stats
+  };
 }
 
-function getAlivePlayers() {
-  return [...appState.players.values()].filter(isAlive);
+function snapshot() {
+  return {
+    t: "state",
+    phase: state.phase,
+    countdown: state.countdownValue,
+    winnerId: state.winnerId,
+    maxPlayers: state.maxPlayers,
+    roomCode: state.roomCode,
+    startedAt: state.roundStartedAt,
+    feed: state.feed.slice(0, 5),
+    players: [...state.players.values()].map(compactPlayer)
+  };
 }
 
-function maybeDeclareWinner() {
-  const alivePlayers = getAlivePlayers();
-  if (alivePlayers.length === 1 && appState.gamePhase === "battle") {
-    appState.winnerId = alivePlayers[0].id;
-    appState.gamePhase = "finished";
-    sendToAll({ type: "winner", winnerId: alivePlayers[0].id, winnerName: alivePlayers[0].name });
-    playVictoryFanfare();
-  } else if (!alivePlayers.length && appState.gamePhase === "battle") {
-    appState.winnerId = null;
-    appState.gamePhase = "finished";
+function send(connection, message) {
+  if (connection?.open) connection.send(message);
+}
+
+function sendServer(message) {
+  if (state.serverSocket?.readyState === WebSocket.OPEN) {
+    state.serverSocket.send(JSON.stringify(message));
   }
 }
 
-function applyMoveStart(playerId, direction) {
-  if (appState.gamePhase !== "battle") return;
-  const player = appState.players.get(playerId);
-  if (!player || player.dead || Date.now() < (player.hitUntil || 0)) return;
-  if (setPlayerMoveIntent(player, direction)) {
-    appState.needsRender = true;
-  }
+function broadcast(message) {
+  state.connections.forEach((connection) => send(connection, message));
 }
 
-function applyMoveStop(playerId, direction = null) {
-  const player = appState.players.get(playerId);
-  if (!player || player.dead) return;
-  if (releasePlayerMoveIntent(player, direction)) {
-    appState.needsRender = true;
-  }
-}
-
-function applyJump(playerId) {
-  if (appState.gamePhase !== "battle") return;
-  const player = appState.players.get(playerId);
-  if (!player || player.dead) return;
+function broadcastSnapshot(force = false) {
   const now = Date.now();
-  if (now - player.lastJumpAt < JUMP_COOLDOWN || now < (player.hitUntil || 0)) return;
-  player.lastJumpAt = now;
-  player.platformZoneId = null;
-  player.airborneUntil = now + JUMP_AIR_TIME;
-  broadcastState();
-}
-
-function applyAttack(playerId) {
-  if (appState.gamePhase !== "battle") return;
-  const attacker = appState.players.get(playerId);
-  if (!attacker || attacker.dead) return;
-  const now = Date.now();
-  if (now - attacker.lastAttackAt < ATTACK_COOLDOWN || now < (attacker.hitUntil || 0)) return;
-  attacker.lastAttackAt = now;
-  attacker.attackingUntil = now + 240;
-  let anyHit = false;
-  let totalDamage = 0;
-  let lastTargetName = "";
-
-  appState.players.forEach((target) => {
-    if (target.id === attacker.id || target.dead) return;
-    if (isAirborne(target, now) && !isAirborne(attacker, now)) return;
-    if (isInHideZone(target, now) && !sameHideZone(attacker, target)) return;
-    if (!isSameCombatLayer(attacker, target, now)) return;
-    const directionCheck = attacker.direction === "right" ? target.x >= attacker.x : target.x <= attacker.x;
-    if (!directionCheck) return;
-    if (Math.abs(target.x - attacker.x) > ATTACK_RANGE) return;
-
-    const highGroundBonus = Math.max(0, getPlayerTier(attacker, now) - getPlayerTier(target, now)) * 3;
-    const damage = Math.floor(ATTACK_DAMAGE_MIN + Math.random() * (ATTACK_DAMAGE_MAX - ATTACK_DAMAGE_MIN + 1)) + highGroundBonus;
-    target.hp = Math.max(0, target.hp - damage);
-    target.hitUntil = now + HIT_STUN;
-    target.direction = target.x >= attacker.x ? "right" : "left";
-    target.velocityX = attacker.direction === "right" ? 2.4 : -2.4;
-    target.moveIntent = 0;
-    if (getPlayerTier(target, now) > 0 && getPlayerTier(attacker, now) >= getPlayerTier(target, now)) {
-      target.platformZoneId = null;
-      target.airborneUntil = Math.max(target.airborneUntil || 0, now + 260);
-    }
-    target.x = clampX(target.x + target.velocityX * 1.1);
-    attacker.velocityX = attacker.direction === "right" ? 1.1 : -1.1;
-    addDamageBurst(target.x, damage, damage >= 24, attacker.avatarId);
-    anyHit = true;
-    totalDamage += damage;
-    lastTargetName = target.name;
-
-    if (target.hp <= 0) {
-      target.dead = true;
-      target.airborneUntil = 0;
-      target.attackingUntil = 0;
-      target.velocityX = 0;
-      target.moveIntent = 0;
-    }
-  });
-
-  if (anyHit) {
-    playHitTone();
-    const attackerConnection = appState.connections.get(attacker.id);
-    if (attackerConnection?.open) {
-      attackerConnection.send({
-        type: "attack-hit",
-        amount: totalDamage,
-        targetName: lastTargetName
-      });
-    }
+  if (!force && now - state.lastSyncAt < CONFIG.syncMs) return;
+  state.lastSyncAt = now;
+  const roomState = snapshot();
+  if (state.serverSocket?.readyState === WebSocket.OPEN && state.mode === "host") {
+    sendServer({ t: "host-state", room: state.roomCode, state: roomState });
   }
-
-  maybeDeclareWinner();
-  broadcastState();
-}
-
-function runCountdown(index = 0) {
-  if (index >= COUNTDOWN_STEPS.length) {
-    appState.countdownValue = "";
-    appState.gamePhase = "battle";
-    broadcastState();
-    status("開打！");
-    return;
-  }
-
-  appState.gamePhase = "countdown";
-  appState.countdownValue = COUNTDOWN_STEPS[index];
-  playCountdownTone(COUNTDOWN_STEPS[index]);
-  broadcastState();
-  appState.countdownTimer = setTimeout(() => runCountdown(index + 1), COUNTDOWN_STEPS[index] === "FIGHT!" ? 620 : 820);
-}
-
-function startBattleCountdown() {
-  clearTimeout(appState.countdownTimer);
-  resetBattle();
-  runCountdown(0);
-}
-
-function updatePlayerStatus() {
-  if (!appState.localPlayer) return;
-  const connected = updatePlayerConnectionChip();
-  const me = appState.localPlayer;
-  const winner = appState.winnerId ? me.id === appState.winnerId : false;
-  const hitAge = Date.now() - (appState.lastAttackHitAt || 0);
-  el.attackButton.classList.toggle("is-hit-confirm", hitAge < 420);
-
-  if (!connected) {
-    setPlayerStatusSummary("RECONNECT", "和房主的連線中斷了，請重新掃碼加入。");
-    setControlButtonsEnabled(false);
-  } else if (appState.gamePhase === "countdown") {
-    setPlayerStatusSummary("COUNTDOWN", `倒數 ${appState.countdownValue || ""}，準備左右移動、跳躍、攻擊。`);
-    setControlButtonsEnabled(false);
-  } else if (appState.gamePhase === "lobby") {
-    setPlayerStatusSummary("WAITING", "等待房主開始亂鬥。開始後用左右移動、跳躍和攻擊把別人打下去。");
-    setControlButtonsEnabled(false);
-  } else if (winner) {
-    setPlayerStatusSummary("WINNER", "你是最後的倖存者，等房主重設後可以再玩一局。");
-    setControlButtonsEnabled(false);
-  } else if (me.dead) {
-    setPlayerStatusSummary("DEAD", "你已經被淘汰了，等房主重設下一局。");
-    setControlButtonsEnabled(false);
-  } else if (appState.gamePhase === "finished") {
-    const winnerName = appState.localPlayerSnapshot.find((item) => item.id === appState.winnerId)?.name;
-    setPlayerStatusSummary("FINISHED", `${winnerName || "有人"} 活到最後，等房主重設下一局。`);
-    setControlButtonsEnabled(false);
-  } else {
-    if (hitAge < 1200) {
-      const targetLabel = appState.lastAttackVictim ? `命中 ${appState.lastAttackVictim}` : "命中對手";
-      const damageLabel = appState.lastAttackDamage ? `，${appState.lastAttackDamage} DAMAGE` : "";
-      setPlayerStatusSummary("HIT CONFIRM", `${targetLabel}${damageLabel}。繼續追打。`);
-    } else {
-      const shortStatus = me.hp <= 35 ? "殘血小心" : combatStatusText(me);
-      setPlayerStatusSummary("BATTLE", `狀態 ${shortStatus}，左右移動、跳躍、攻擊。`);
-    }
-    setControlButtonsEnabled(true);
-  }
-
-  updateRoundBanner();
-}
-
-function optimisticMove(direction) {
-  if (!appState.localPlayer || appState.localPlayer.dead) return;
-  setPlayerMoveIntent(appState.localPlayer, direction);
-  appState.activeMoveDirection = direction;
-  appState.needsRender = true;
-}
-
-function optimisticMoveStop(direction = null) {
-  if (!appState.localPlayer) return;
-  releasePlayerMoveIntent(appState.localPlayer, direction);
-  if (!direction || appState.activeMoveDirection === direction) {
-    appState.activeMoveDirection = null;
-  }
-  appState.needsRender = true;
-}
-
-function optimisticJump() {
-  if (!appState.localPlayer || appState.localPlayer.dead) return;
-  appState.localPlayer.airborneUntil = Date.now() + JUMP_AIR_TIME;
-  appState.localPlayer.velocityX *= 1.04;
-  appState.needsRender = true;
-}
-
-function optimisticAttack() {
-  if (!appState.localPlayer || appState.localPlayer.dead) return;
-  appState.localPlayer.attackingUntil = Date.now() + 220;
-  appState.needsRender = true;
-}
-
-function stopMoveHold(sendMoveStop) {
-  const activeDirection = appState.activeMoveDirection;
-  appState.activeMoveDirection = null;
-  if (activeDirection && typeof sendMoveStop === "function") {
-    optimisticMoveStop(activeDirection);
-    sendMoveStop(activeDirection);
-  }
-}
-
-function startMoveHold(event, direction, sendMoveStart, sendMoveStop) {
-  if (event.pointerType === "mouse" && event.button !== 0) return;
-  event.preventDefault();
-  if (appState.activeMoveDirection && appState.activeMoveDirection !== direction) {
-    stopMoveHold(sendMoveStop);
-  }
-  if (event.currentTarget?.setPointerCapture) {
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-  if (appState.activeMoveDirection === direction) return;
-  optimisticMove(direction);
-  sendMoveStart(direction);
-}
-
-function applyRemoteState(message) {
-  appState.winnerId = message.winnerId;
-  appState.gamePhase = message.gamePhase || "lobby";
-  appState.countdownValue = message.countdownValue || "";
-  appState.localPlayerSnapshot = Array.isArray(message.players) ? message.players : [];
-  const latest = appState.localPlayerSnapshot.find((player) => player.id === appState.playerId);
-  if (latest) {
-    appState.localPlayer = latest;
-    appState.needsRender = true;
-  }
-  renderCountdownOverlay();
-  updatePlayerStatus();
-  updatePlayerUxMeta();
-  updateRoundBanner();
+  broadcast(roomState);
 }
 
 function registerConnection(connection) {
-  connection.on("data", (message) => {
-    if (!message || typeof message !== "object") return;
+  connection.on("data", (message) => handleHostMessage(connection, message));
+  connection.on("close", () => {
+    const entry = [...state.connections.entries()].find(([, conn]) => conn === connection);
+    if (!entry) return;
+    const player = state.players.get(entry[0]);
+    if (player) {
+      player.connected = false;
+      player.input.left = false;
+      player.input.right = false;
+      addFeed(`${player.name} disconnected`, "warn");
+    }
+    state.connections.delete(entry[0]);
+    state.dirtyLobby = true;
+    broadcastSnapshot(true);
+  });
+}
 
-    if (message.type === "join") {
-      if (!message.player?.id) return;
-      const player = createPlayer(message.player);
-      appState.players.set(player.id, player);
-      appState.connections.set(player.id, connection);
-      connection.send({
-        type: "joined",
-        winnerId: appState.winnerId,
-        gamePhase: appState.gamePhase,
-        countdownValue: appState.countdownValue,
-        player,
-        players: [...appState.players.values()]
-      });
-      broadcastState();
+function handleHostMessage(connection, message) {
+  if (!message || typeof message !== "object") return;
+  if (message.t === "client-event") {
+    handleHostMessage(connection, { ...message.event, id: message.id });
+    return;
+  }
+  if (message.t === "player-joined") {
+    const playerPayload = message.player;
+    if (!playerPayload?.id) return;
+    const player = state.players.get(playerPayload.id) || createPlayer(playerPayload, connection);
+    player.connected = true;
+    player.lastSeen = Date.now();
+    player.name = String(playerPayload.name || player.name).slice(0, 16);
+    player.avatarId = avatarById(playerPayload.avatarId).id;
+    state.players.set(player.id, player);
+    addFeed(`${player.name} joined the arena`, "join");
+    state.dirtyLobby = true;
+    broadcastSnapshot(true);
+    return;
+  }
+  if (message.t === "player-disconnected") {
+    const player = state.players.get(message.id);
+    if (player) {
+      player.connected = false;
+      player.input.left = false;
+      player.input.right = false;
+      addFeed(`${player.name} disconnected`, "warn");
+      state.dirtyLobby = true;
+      broadcastSnapshot(true);
+    }
+    return;
+  }
+  const now = Date.now();
+
+  if (message.t === "join") {
+    if (!message.p?.id) return;
+    if (!state.players.has(message.p.id) && state.players.size >= state.maxPlayers) {
+      send(connection, { t: "join-rejected", reason: "ROOM_FULL" });
       return;
     }
+    const player = state.players.get(message.p.id) || createPlayer(message.p, connection);
+    player.connected = true;
+    player.lastSeen = now;
+    player.avatarId = avatarById(message.p.avatarId).id;
+    player.name = String(message.p.name || player.name).slice(0, 16);
+    state.players.set(player.id, player);
+    state.connections.set(player.id, connection);
+    send(connection, { t: "joined", you: player.id, state: snapshot() });
+    addFeed(`${player.name} joined the arena`, "join");
+    state.dirtyLobby = true;
+    broadcastSnapshot(true);
+    tone(660, 0.06);
+    return;
+  }
 
-    if (message.type === "move") {
-      applyMoveStart(message.playerId, message.direction);
+  if (message.t === "input") {
+    const player = state.players.get(message.id);
+    if (!player || player.dead) return;
+    player.lastSeen = now;
+    player.connected = true;
+    const input = message.i || {};
+    player.input.left = Boolean(input.left);
+    player.input.right = Boolean(input.right);
+    if (input.jump) tryJump(player, now);
+    if (input.attack) tryAttack(player, now);
+  }
+
+  if (message.t === "heartbeat") {
+    const player = state.players.get(message.id);
+    if (player) {
+      player.lastSeen = now;
+      player.connected = true;
     }
+  }
+}
 
-    if (message.type === "move-stop") {
-      applyMoveStop(message.playerId, message.direction);
+function resetRound(nextPhase = PHASE.LOBBY) {
+  state.phase = nextPhase;
+  state.winnerId = "";
+  state.countdownValue = "";
+  state.roundStartedAt = 0;
+  [...state.players.values()].forEach((player, index) => {
+    player.x = 8 + (index % 12) * 7.4;
+    player.y = 8;
+    player.vx = 0;
+    player.vy = 0;
+    player.hp = 100;
+    player.dead = false;
+    player.dir = index % 2 ? -1 : 1;
+    player.attackUntil = 0;
+    player.hitUntil = 0;
+    player.input.left = false;
+    player.input.right = false;
+    player.stats = { hits: 0, eliminations: 0, damage: 0, survivedMs: 0 };
+  });
+  addFeed("Round reset. Get ready.", "info");
+  state.dirtyHud = true;
+  state.dirtyLobby = true;
+  state.dirtyWinner = true;
+  broadcastSnapshot(true);
+}
+
+function startCountdown() {
+  if (state.players.size < 2) {
+    toast("至少需要 2 位玩家才能開始。");
+    return;
+  }
+  resetRound(PHASE.COUNTDOWN);
+  const steps = ["3", "2", "1", "FIGHT"];
+  let index = 0;
+  const next = () => {
+    state.phase = PHASE.COUNTDOWN;
+    state.countdownValue = steps[index];
+    state.dirtyHud = true;
+    broadcastSnapshot(true);
+    tone(index < 3 ? 440 : 760, index < 3 ? 0.08 : 0.18);
+    if (index >= steps.length - 1) {
+      window.setTimeout(() => {
+        state.phase = PHASE.BATTLE;
+        state.countdownValue = "";
+        state.roundStartedAt = Date.now();
+        addFeed("Battle started", "info");
+        broadcastSnapshot(true);
+      }, 650);
+      return;
     }
+    index += 1;
+    window.setTimeout(next, 820);
+  };
+  next();
+}
 
-    if (message.type === "jump") {
-      applyJump(message.playerId);
-    }
+function forcePhase(phase) {
+  if (phase === PHASE.COUNTDOWN) {
+    startCountdown();
+    return;
+  }
+  if (phase === PHASE.BATTLE) {
+    resetRound(PHASE.BATTLE);
+    state.roundStartedAt = Date.now();
+  } else if (phase === PHASE.FINISHED) {
+    state.phase = PHASE.FINISHED;
+  } else {
+    resetRound(PHASE.LOBBY);
+  }
+  broadcastSnapshot(true);
+}
 
-    if (message.type === "attack") {
-      applyAttack(message.playerId);
+function cleanupInactive() {
+  const now = Date.now();
+  let removed = 0;
+  [...state.players.entries()].forEach(([id, player]) => {
+    if (!player.connected || now - player.lastSeen > CONFIG.staleMs) {
+      state.players.delete(id);
+      state.connections.delete(id);
+      removed += 1;
     }
   });
+  if (removed) addFeed(`Removed ${removed} inactive player${removed > 1 ? "s" : ""}`, "warn");
+  state.dirtyLobby = true;
+  broadcastSnapshot(true);
+}
 
-  connection.on("close", () => {
-    const playerId = [...appState.connections.entries()].find(([, conn]) => conn === connection)?.[0];
-    if (playerId) {
-      appState.connections.delete(playerId);
-      appState.players.delete(playerId);
-      maybeDeclareWinner();
-      broadcastState();
+function kickPlayer(id) {
+  const player = state.players.get(id);
+  if (!player) return;
+  send(state.connections.get(id), { t: "kicked" });
+  state.connections.get(id)?.close?.();
+  state.connections.delete(id);
+  state.players.delete(id);
+  addFeed(`${player.name} removed from room`, "warn");
+  state.dirtyLobby = true;
+  broadcastSnapshot(true);
+}
+
+function tryJump(player, now) {
+  if (state.phase !== PHASE.BATTLE || player.dead || now - player.lastJumpAt < 520 || player.y > 9.2) return;
+  player.lastJumpAt = now;
+  player.vy = CONFIG.jumpVelocity;
+}
+
+function tryAttack(attacker, now) {
+  if (state.phase !== PHASE.BATTLE || attacker.dead || now - attacker.lastAttackAt < CONFIG.attackCooldownMs) return;
+  attacker.lastAttackAt = now;
+  attacker.attackUntil = now + CONFIG.attackArcMs;
+  let didHit = false;
+  [...state.players.values()].forEach((target) => {
+    if (target.id === attacker.id || target.dead) return;
+    if (Math.abs(target.y - attacker.y) > 9) return;
+    const dx = target.x - attacker.x;
+    if (Math.sign(dx || attacker.dir) !== attacker.dir) return;
+    if (Math.abs(dx) > CONFIG.attackRange) return;
+    const damage = Math.floor(15 + Math.random() * 14);
+    target.hp = Math.max(0, target.hp - damage);
+    target.hitUntil = now + CONFIG.hitStunMs;
+    target.vx += attacker.dir * 0.7;
+    target.vy = Math.max(target.vy, 0.25);
+    attacker.stats.hits += 1;
+    attacker.stats.damage += damage;
+    didHit = true;
+    addFeed(`${attacker.name} hit ${target.name} for ${damage}`, "hit");
+    send(state.connections.get(attacker.id), { t: "hit-confirm", target: target.name, damage });
+    send(state.connections.get(target.id), { t: "got-hit", from: attacker.name, damage });
+    if (target.hp <= 0 && !target.dead) {
+      target.dead = true;
+      target.input.left = false;
+      target.input.right = false;
+      attacker.stats.eliminations += 1;
+      addFeed(`${target.name} was eliminated by ${attacker.name}`, "ko");
+      send(state.connections.get(target.id), { t: "eliminated", by: attacker.name });
+      chord([[180, 0, 0.08], [120, 70, 0.1]]);
     }
   });
+  if (didHit) {
+    tone(210, 0.05, "sawtooth", 0.05);
+    vibration([20, 20, 35]);
+  } else {
+    tone(420, 0.035, "triangle", 0.025);
+  }
+  checkWinner();
+  broadcastSnapshot(true);
+}
+
+function checkWinner() {
+  if (state.phase !== PHASE.BATTLE) return;
+  const alive = [...state.players.values()].filter((player) => !player.dead);
+  if (alive.length === 1 && state.players.size > 1) {
+    state.winnerId = alive[0].id;
+    state.phase = PHASE.FINISHED;
+    alive[0].stats.survivedMs = Date.now() - state.roundStartedAt;
+    addFeed(`${alive[0].name} wins the round`, "win");
+    state.dirtyWinner = true;
+    chord([[523, 0, 0.12], [659, 110, 0.12], [784, 220, 0.18], [1046, 360, 0.24]]);
+    broadcast({ t: "winner", id: alive[0].id, name: alive[0].name });
+  }
+}
+
+function groundForX(x) {
+  const platform = PLATFORMS
+    .filter((p) => x >= p.x && x <= p.x + p.w)
+    .sort((a, b) => b.y - a.y)[0];
+  return platform ? platform.y + pHeight(platform) : 8;
+}
+
+function pHeight(platform) {
+  return platform.id === "ground" ? 0 : platform.h;
+}
+
+function simulateHost(now) {
+  if (!state.lastFrameAt) state.lastFrameAt = now;
+  const dt = Math.min(2.5, (now - state.lastFrameAt) / 16.67);
+  state.lastFrameAt = now;
+  if (state.phase !== PHASE.BATTLE) return;
+
+  const elapsed = Math.floor((now - state.roundStartedAt) / 1000);
+  if (elapsed >= CONFIG.roundSeconds) {
+    const alive = [...state.players.values()].filter((player) => !player.dead);
+    alive.sort((a, b) => b.hp - a.hp);
+    state.winnerId = alive[0]?.id || "";
+    state.phase = PHASE.FINISHED;
+    addFeed(`${alive[0]?.name || "No one"} wins by time`, "win");
+    state.dirtyWinner = true;
+    broadcastSnapshot(true);
+    return;
+  }
+
+  [...state.players.values()].forEach((player) => {
+    if (player.dead) return;
+    if (now - player.lastSeen > CONFIG.staleMs) {
+      player.connected = false;
+      player.input.left = false;
+      player.input.right = false;
+    }
+    if (now < player.hitUntil) {
+      player.vx *= 0.97;
+    } else {
+      const dir = Number(player.input.right) - Number(player.input.left);
+      if (dir) {
+        player.dir = dir;
+        player.vx += dir * CONFIG.runAccel * dt;
+      }
+    }
+    player.vx = clamp(player.vx, -CONFIG.maxSpeed, CONFIG.maxSpeed);
+    player.x = clamp(player.x + player.vx * dt, 3, 97);
+    player.vx *= Math.pow(CONFIG.friction, dt);
+    player.vy -= CONFIG.gravity * dt;
+    player.y += player.vy * dt;
+    const ground = groundForX(player.x);
+    if (player.y <= ground) {
+      player.y = ground;
+      player.vy = 0;
+    }
+  });
+  checkWinner();
+  broadcastSnapshot();
+}
+
+function updateHostHud(now) {
+  const players = [...state.players.values()];
+  const alive = players.filter((p) => !p.dead);
+  const winner = state.players.get(state.winnerId);
+  const remaining = state.phase === PHASE.BATTLE
+    ? Math.max(0, CONFIG.roundSeconds - Math.floor((now - state.roundStartedAt) / 1000))
+    : null;
+  setText(el.playerCount, `${players.length} / ${state.maxPlayers}`);
+  setText(el.hudMode, state.phase.toUpperCase());
+  setText(el.hudAlive, alive.length);
+  setText(el.hudTimer, remaining == null ? "--" : `${remaining}s`);
+  setText(el.hostLeader, winner?.name || alive.sort((a, b) => b.hp - a.hp)[0]?.name || "等待中");
+  setText(el.raceSummary, summaryText(players.length, alive.length));
+  el.phaseSelect.value = state.phase;
+  state.dirtyHud = false;
+}
+
+function summaryText(total, alive) {
+  if (!total) return "等待玩家加入...";
+  if (state.phase === PHASE.LOBBY) return `${total} 位玩家已加入，準備後開始。`;
+  if (state.phase === PHASE.COUNTDOWN) return `倒數 ${state.countdownValue || ""}，手機輸入暫時鎖定。`;
+  if (state.phase === PHASE.BATTLE) return `場上剩 ${alive} 人，戰鬥進行中。`;
+  if (state.phase === PHASE.FINISHED) return "本局結束，準備下一局。";
+  return "";
+}
+
+function renderLobby(now) {
+  if (!state.dirtyLobby && now - state.lastLobbyRenderAt < CONFIG.lobbyRenderMs) return;
+  state.lastLobbyRenderAt = now;
+  const players = [...state.players.values()];
+  setText(el.lobbySummary, `${players.length} joined`);
+  el.playerGrid?.classList.toggle("empty-state", players.length === 0);
+  const html = players.length
+    ? players.map((player) => {
+      const avatar = avatarById(player.avatarId);
+      const status = player.connected ? (player.dead ? "out" : "ready") : "disconnected";
+      return `
+        <article class="player-tile ${status}" data-player="${escapeHtml(player.id)}">
+          ${avatarBadge(avatar)}
+          <div>
+            <strong>${escapeHtml(player.name)}</strong>
+            <span>${escapeHtml(avatar.name)} · ${status}</span>
+          </div>
+          <button class="kick-button" data-kick="${escapeHtml(player.id)}" title="Remove player">×</button>
+        </article>
+      `;
+    }).join("")
+    : "<p>玩家加入後會出現在這裡。</p>";
+  if (state.lastPlayerGridHtml !== html && el.playerGrid) {
+    el.playerGrid.innerHTML = html;
+    state.lastPlayerGridHtml = html;
+    el.playerGrid.querySelectorAll("[data-kick]").forEach((button) => {
+      button.addEventListener("click", () => kickPlayer(button.dataset.kick));
+    });
+  }
+  state.dirtyLobby = false;
+}
+
+function renderFeed() {
+  if (!state.dirtyFeed || !el.battleFeed) return;
+  const html = state.feed.length
+    ? state.feed.map((item) => `<li class="${item.tone}">${escapeHtml(item.message)}</li>`).join("")
+    : "<li>房間準備中，等待玩家掃碼加入。</li>";
+  if (state.lastFeedHtml !== html) {
+    el.battleFeed.innerHTML = html;
+    state.lastFeedHtml = html;
+  }
+  state.dirtyFeed = false;
+}
+
+function renderWinnerOverlay() {
+  const winner = state.players.get(state.winnerId);
+  setVisible(el.winnerOverlay, state.phase === PHASE.FINISHED && winner);
+  if (!winner || state.phase !== PHASE.FINISHED || !state.dirtyWinner) return;
+  const avatar = avatarById(winner.avatarId);
+  el.winnerOverlay.innerHTML = `
+    <div class="winner-card" style="--winner:${avatar.color}; --accent:${avatar.accent}">
+      ${avatarBadge(avatar)}
+      <span>WINNER</span>
+      <strong>${escapeHtml(winner.name)}</strong>
+      <p>${escapeHtml(avatar.title)} · ${winner.stats.eliminations} KOs · ${winner.stats.hits} hits</p>
+      <button id="winnerPlayAgain" class="primary-button">Play Again</button>
+    </div>
+  `;
+  el.winnerOverlay.querySelector("#winnerPlayAgain")?.addEventListener("click", startCountdown);
+  state.dirtyWinner = false;
+}
+
+function renderCountdown() {
+  const visible = state.phase === PHASE.COUNTDOWN && state.countdownValue;
+  setVisible(el.countdownOverlay, visible);
+  if (!visible) return;
+  setText(el.countdownNumber, state.countdownValue);
+  setText(el.countdownLabel, state.countdownValue === "FIGHT" ? "BATTLE START" : "GET READY");
+}
+
+function worldToCanvas(x, y, canvas) {
+  return {
+    x: (x / CONFIG.worldWidth) * canvas.width,
+    y: canvas.height - 74 - y * 7.4
+  };
+}
+
+function drawArena(ctx, canvas, players, now, compact = false) {
+  if (!ctx || !canvas) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, "#a9e7ff");
+  sky.addColorStop(0.48, "#f7f0ff");
+  sky.addColorStop(1, "#66b567");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  drawBackground(ctx, w, h, now, compact);
+  drawPlatforms(ctx, canvas);
+  players.forEach((player, index) => drawPlayer(ctx, canvas, player, index, now, compact));
+  drawForeground(ctx, w, h, compact);
+}
+
+function drawBackground(ctx, w, h, now, compact) {
+  ctx.save();
+  ctx.globalAlpha = compact ? 0.72 : 1;
+  drawCloud(ctx, 110 + Math.sin(now / 1800) * 10, 80, 1.1);
+  drawCloud(ctx, w - 220, 118, 0.82);
+  drawCloud(ctx, w * 0.52, 54, 0.66);
+  ctx.fillStyle = "#7ccf83";
+  drawHill(ctx, -40, h - 166, 320, 170);
+  drawHill(ctx, w - 360, h - 178, 410, 190);
+  ctx.fillStyle = "#8b5f42";
+  for (let i = 0; i < 5; i += 1) {
+    drawHouse(ctx, 170 + i * 155, h - 178 + (i % 2) * 12, i);
+  }
+  ctx.restore();
+}
+
+function drawCloud(ctx, x, y, s) {
+  ctx.fillStyle = "rgba(255,255,255,0.86)";
+  ctx.beginPath();
+  ctx.ellipse(x, y, 46 * s, 20 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 34 * s, y - 13 * s, 32 * s, 25 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 72 * s, y, 48 * s, 22 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawHill(ctx, x, y, w, h) {
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h, w / 2, h, 0, Math.PI, 0);
+  ctx.fill();
+}
+
+function drawHouse(ctx, x, y, index) {
+  ctx.fillStyle = index % 2 ? "#f9d29d" : "#ffd7e7";
+  ctx.fillRect(x, y, 74, 58);
+  ctx.fillStyle = index % 2 ? "#9e5fbb" : "#e66f77";
+  ctx.beginPath();
+  ctx.moveTo(x - 8, y + 8);
+  ctx.lineTo(x + 36, y - 36);
+  ctx.lineTo(x + 82, y + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#73513d";
+  ctx.fillRect(x + 28, y + 24, 18, 34);
+}
+
+function drawPlatforms(ctx, canvas) {
+  PLATFORMS.forEach((platform) => {
+    const left = (platform.x / 100) * canvas.width;
+    const top = canvas.height - 74 - platform.y * 7.4;
+    const width = (platform.w / 100) * canvas.width;
+    const height = platform.id === "ground" ? 52 : 24;
+    ctx.fillStyle = platform.id === "ground" ? "#4f8e4e" : "#8b5f3f";
+    roundRect(ctx, left, top, width, height, 16);
+    ctx.fill();
+    ctx.fillStyle = platform.id === "ground" ? "#7ad46d" : "#e1b071";
+    roundRect(ctx, left, top, width, 12, 14);
+    ctx.fill();
+  });
+}
+
+function drawForeground(ctx, w, h, compact) {
+  if (compact) return;
+  for (let i = 0; i < 18; i += 1) {
+    const x = (i * 97) % w;
+    const y = h - 48 - (i % 3) * 4;
+    ctx.fillStyle = i % 2 ? "#ff7ab0" : "#fff07a";
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#3d8a47";
+    ctx.fillRect(x - 1, y + 4, 2, 11);
+  }
+}
+
+function drawPlayer(ctx, canvas, player, index, now, compact) {
+  const avatar = avatarById(player.avatarId || player.a);
+  const x = player.x;
+  const y = player.y ?? 8;
+  const hp = player.hp ?? player.h ?? 100;
+  const dead = Boolean(player.dead);
+  const dir = player.dir ?? player.d ?? 1;
+  const atk = player.attackUntil ?? player.atk ?? 0;
+  const hit = player.hitUntil ?? player.hit ?? 0;
+  const pos = worldToCanvas(x, y, canvas);
+  const size = compact ? 20 : 27;
+  const bob = dead ? 0 : Math.sin(now / 130 + index) * 2;
+  ctx.save();
+  ctx.translate(pos.x, pos.y + bob);
+  ctx.globalAlpha = dead ? 0.38 : 1;
+
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.beginPath();
+  ctx.ellipse(0, size + 7, size * 0.8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (atk > now && !compact) {
+    ctx.strokeStyle = avatar.accent;
+    ctx.lineWidth = 10;
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = avatar.color;
+    ctx.beginPath();
+    ctx.arc(dir > 0 ? 24 : -24, -4, 35, dir > 0 ? -0.8 : Math.PI - 0.8, dir > 0 ? 0.8 : Math.PI + 0.8);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = avatar.color;
+  roundRect(ctx, -size * 0.62, -size * 0.1, size * 1.24, size * 1.35, 12);
+  ctx.fill();
+  ctx.fillStyle = avatar.accent;
+  roundRect(ctx, -size * 0.42, size * 0.28, size * 0.84, size * 0.3, 8);
+  ctx.fill();
+  ctx.fillStyle = "#ffe4c7";
+  ctx.beginPath();
+  ctx.arc(0, -size * 0.56, size * 0.58, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = avatar.color;
+  ctx.beginPath();
+  ctx.arc(-2 * dir, -size * 0.78, size * 0.6, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#25314f";
+  ctx.fillRect(-6 * dir, -size * 0.58, 3, 3);
+  ctx.fillRect(7 * dir, -size * 0.58, 3, 3);
+
+  if (hit > now) {
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(-size * 0.85, -size * 1.1, size * 1.7, size * 2.1);
+  }
+
+  ctx.restore();
+
+  if (!compact) {
+    drawPlayerHud(ctx, pos.x, pos.y, player.name || player.n, hp, dead);
+  }
+}
+
+function drawPlayerHud(ctx, x, y, name, hp, dead) {
+  ctx.save();
+  ctx.font = "800 14px Outfit, Noto Sans TC, sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(28,26,44,0.62)";
+  ctx.fillStyle = "#fff";
+  ctx.strokeText(name, x, y - 52);
+  ctx.fillText(name, x, y - 52);
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  roundRect(ctx, x - 36, y - 46, 72, 9, 6);
+  ctx.fill();
+  ctx.fillStyle = dead ? "#798094" : hp > 45 ? "#5ee28b" : hp > 20 ? "#ffd166" : "#ff5f75";
+  roundRect(ctx, x - 36, y - 46, 72 * Math.max(0, hp) / 100, 9, 6);
+  ctx.fill();
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  const radius = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+function hostLoop(now) {
+  simulateHost(now);
+  const players = [...state.players.values()];
+  const compact = players.length >= 30;
+  drawArena(hostCtx, el.arenaCanvas, players, now, compact);
+  if (state.dirtyHud || state.phase === PHASE.BATTLE || now - state.lastLobbyRenderAt > CONFIG.lobbyRenderMs) updateHostHud(now);
+  renderLobby(now);
+  renderFeed();
+  renderCountdown();
+  renderWinnerOverlay();
+  window.requestAnimationFrame(hostLoop);
+}
+
+function updateFromSnapshot(roomState) {
+  state.phase = roomState.phase || PHASE.LOBBY;
+  state.countdownValue = roomState.countdown || "";
+  state.winnerId = roomState.winnerId || "";
+  state.maxPlayers = roomState.maxPlayers || CONFIG.maxPlayers;
+  state.roomCode = roomState.roomCode || state.roomCode;
+  state.roundStartedAt = roomState.startedAt || 0;
+  state.snapshot = Array.isArray(roomState.players) ? roomState.players : [];
+  state.feed = Array.isArray(roomState.feed) ? roomState.feed : state.feed;
+}
+
+function localPlayer() {
+  return state.snapshot.find((player) => player.id === state.localPlayerId);
+}
+
+function renderPlayerUi(now) {
+  const me = localPlayer();
+  const connected = Boolean(state.hostConnection?.open);
+  el.playerConnectionChip?.classList.toggle("offline", !connected);
+  setText(el.playerConnectionChip, connected ? "CONNECTED" : "RECONNECT");
+  if (!me) {
+    setStatus(connected ? "READY" : "RECONNECT", connected ? "選角色後加入戰場。" : "和房主斷線，請重新掃碼。");
+    setControls(false);
+    return;
+  }
+  const avatar = avatarById(me.a);
+  setText(el.playerGreeting, `${me.n} · ${avatar.weapon}`);
+  const out = Boolean(me.dead);
+  const active = connected && state.phase === PHASE.BATTLE && !out;
+  setControls(active);
+  if (state.phase === PHASE.COUNTDOWN) setStatus("COUNTDOWN", `倒數 ${state.countdownValue || ""}，準備拇指位置。`);
+  else if (out) setStatus("OUT", "你已經被淘汰，等下一局再戰。");
+  else if (state.phase === PHASE.BATTLE) setStatus("BATTLE", `HP ${me.h}，左右移動、跳躍、靠近攻擊。`);
+  else if (state.phase === PHASE.FINISHED) setStatus("RESULT", state.winnerId === me.id ? "你贏了！等房主再開一局。" : "本局結束，等房主再開一局。");
+  else setStatus("WAITING", "已加入房間，等房主開始。");
+
+  setVisible(el.playerRoundBanner, state.phase === PHASE.FINISHED || out);
+  if (state.phase === PHASE.FINISHED) {
+    const winner = state.snapshot.find((p) => p.id === state.winnerId);
+    el.playerRoundBanner.innerHTML = `<strong>${escapeHtml(winner?.n || "本局結束")}</strong><span>等待房主按下再來一局。</span>`;
+  } else if (out) {
+    el.playerRoundBanner.innerHTML = "<strong>OUT</strong><span>你已淘汰，現在可以幫朋友加油。</span>";
+  }
+
+  const cooldown = Math.max(0, ((me.lastAttackAt || 0) + CONFIG.attackCooldownMs - now) / CONFIG.attackCooldownMs);
+  el.attackCooldown?.style.setProperty("--cooldown", `${cooldown * 100}%`);
+  drawArena(previewCtx, el.playerPreviewCanvas, [me], now, true);
+  renderCountdown();
+  window.requestAnimationFrame(renderPlayerUi);
+}
+
+function setControls(enabled) {
+  [el.leftButton, el.rightButton, el.jumpButton, el.attackButton].forEach((button) => {
+    if (button && button.disabled === enabled) button.disabled = !enabled;
+  });
+}
+
+function sendInput(extra = {}) {
+  const now = Date.now();
+  const urgent = extra.jump || extra.attack;
+  if (!urgent && now - state.lastInputSentAt < CONFIG.inputMinMs) return;
+  state.lastInputSentAt = now;
+  const inputMessage = {
+    t: "input",
+    id: state.localPlayerId,
+    i: {
+      left: state.input.left,
+      right: state.input.right,
+      ...extra
+    }
+  };
+  if (state.serverSocket?.readyState === WebSocket.OPEN) {
+    sendServer({ t: "client-event", room: state.roomCode, id: state.localPlayerId, event: inputMessage });
+    return;
+  }
+  send(state.hostConnection, inputMessage);
+}
+
+function bindControllerButton(button, onDown, onUp) {
+  if (!button) return;
+  const down = (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    button.classList.add("pressed");
+    button.setPointerCapture?.(event.pointerId);
+    onDown();
+  };
+  const up = () => {
+    button.classList.remove("pressed");
+    onUp?.();
+  };
+  button.addEventListener("pointerdown", down, { passive: false });
+  button.addEventListener("pointerup", up);
+  button.addEventListener("pointercancel", up);
+  button.addEventListener("pointerleave", up);
+  button.addEventListener("lostpointercapture", up);
+}
+
+function wireHostControls() {
+  el.startGameButton?.addEventListener("click", startCountdown);
+  el.playAgainButton?.addEventListener("click", startCountdown);
+  el.resetGameButton?.addEventListener("click", () => resetRound(PHASE.LOBBY));
+  el.cleanupButton?.addEventListener("click", cleanupInactive);
+  el.copyLinkButton?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(state.joinUrl);
+      toast("Join link copied.");
+    } catch (_error) {
+      toast("請手動複製加入網址。");
+    }
+  });
+  el.soundToggleButton?.addEventListener("click", () => {
+    state.sound = !state.sound;
+    el.soundToggleButton.setAttribute("aria-pressed", String(state.sound));
+    setText(el.soundToggleButton, state.sound ? "Sound On" : "Sound Off");
+  });
+  el.maxPlayersInput?.addEventListener("change", () => {
+    state.maxPlayers = clamp(Number(el.maxPlayersInput.value) || CONFIG.maxPlayers, 2, 50);
+    el.maxPlayersInput.value = state.maxPlayers;
+    state.dirtyHud = true;
+    broadcastSnapshot(true);
+  });
+  el.phaseSelect?.addEventListener("change", () => forcePhase(el.phaseSelect.value));
+}
+
+function wirePlayerControls() {
+  bindControllerButton(el.leftButton, () => {
+    state.input.left = true;
+    sendInput();
+  }, () => {
+    state.input.left = false;
+    sendInput();
+  });
+  bindControllerButton(el.rightButton, () => {
+    state.input.right = true;
+    sendInput();
+  }, () => {
+    state.input.right = false;
+    sendInput();
+  });
+  bindControllerButton(el.jumpButton, () => {
+    sendInput({ jump: true });
+    vibration(18);
+    tone(720, 0.04);
+  });
+  bindControllerButton(el.attackButton, () => {
+    sendInput({ attack: true });
+    vibration(20);
+    tone(380, 0.04, "sawtooth");
+  });
+  window.addEventListener("blur", releaseMovement);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) releaseMovement();
+  });
+}
+
+function releaseMovement() {
+  if (!state.input.left && !state.input.right) return;
+  state.input.left = false;
+  state.input.right = false;
+  sendInput();
 }
 
 function startHostMode() {
+  state.mode = "host";
+  setVisible(el.hostView, true);
+  setVisible(el.playerView, false);
+  wireHostControls();
   if (!window.Peer) {
-    status("連線套件載入失敗，請重新整理頁面。");
+    toast("PeerJS 載入失敗，請重新整理。");
     return;
   }
-  appState.mode = "host";
-  el.hostView.classList.remove("hidden");
-  el.playerView.classList.add("hidden");
-  status("正在建立戰場...");
-
   const peer = new window.Peer();
-  appState.peer = peer;
-
+  state.peer = peer;
   peer.on("open", async (id) => {
-    appState.peerId = id;
-    appState.joinCode = randomRoomCode(id);
-    appState.joinUrl = buildJoinUrl(id);
-    setText(el.roomCode, appState.joinCode);
-    setText(el.joinUrl, appState.joinUrl);
-    status("戰場建立成功，讓大家掃 QR Code 加入。");
-    renderBattleArena([]);
-    updateHostUx(0, 0);
-    await renderQrCode(appState.joinUrl);
+    state.roomId = id;
+    state.roomCode = roomCodeFromId(id);
+    state.joinUrl = buildJoinUrl(id);
+    setText(el.roomCode, state.roomCode);
+    setText(el.joinUrl, state.joinUrl);
+    addFeed("Room created. Scan to join.", "info");
+    await renderQr(state.joinUrl);
+    toast("Room ready. Players can join now.");
+    window.requestAnimationFrame(hostLoop);
   });
+  peer.on("connection", registerConnection);
+  peer.on("error", (error) => toast(`Connection error: ${error.type || "unknown"}`));
+}
 
-  peer.on("connection", (connection) => {
-    registerConnection(connection);
+function startServerHostMode(serverUrl) {
+  state.mode = "host";
+  state.serverUrl = serverUrl;
+  setVisible(el.hostView, true);
+  setVisible(el.playerView, false);
+  wireHostControls();
+  const socket = new WebSocket(serverUrl);
+  state.serverSocket = socket;
+  socket.addEventListener("open", () => {
+    sendServer({ t: "create-room" });
+    toast("Connected to room server.");
   });
-
-  peer.on("error", (error) => {
-    status(`連線發生問題：${error.type || "unknown error"}`);
+  socket.addEventListener("message", async (event) => {
+    const message = JSON.parse(event.data);
+    if (message.t === "room-created") {
+      state.roomCode = message.code;
+      state.maxPlayers = Math.min(Number(message.maxPlayers) || CONFIG.maxPlayers, 50);
+      state.joinUrl = buildServerJoinUrl(serverUrl, state.roomCode);
+      setText(el.roomCode, state.roomCode);
+      setText(el.joinUrl, state.joinUrl);
+      el.maxPlayersInput.value = state.maxPlayers;
+      addFeed("Server room created. Scan to join.", "info");
+      await renderQr(state.joinUrl);
+      window.requestAnimationFrame(hostLoop);
+      return;
+    }
+    handleHostMessage(null, message);
   });
+  socket.addEventListener("close", () => toast("Room server disconnected."));
+  socket.addEventListener("error", () => toast("Room server connection failed."));
 }
 
 function startPlayerMode(hostId) {
+  state.mode = "player";
+  setVisible(el.hostView, false);
+  setVisible(el.playerView, true);
+  setupAvatarPicker();
+  wirePlayerControls();
+  setStatus("CONNECTING", "正在連接房主...");
   if (!window.Peer) {
-    status("連線套件載入失敗，請重新整理頁面。");
+    setStatus("ERROR", "連線套件載入失敗，請重新整理。");
     return;
   }
-  appState.mode = "player";
-  el.hostView.classList.add("hidden");
-  el.playerView.classList.remove("hidden");
-  setupAvatarPicker();
-  status("輸入名字、選頭像後，就能加入戰場。");
-  updatePlayerUxMeta();
-
   const peer = new window.Peer();
-  appState.peer = peer;
-
+  state.peer = peer;
   peer.on("open", () => {
     const connection = peer.connect(hostId, { reliable: true });
-    appState.hostConnection = connection;
-
+    state.hostConnection = connection;
     connection.on("open", () => {
-      status("已連上房主，準備加入戰場。");
-      setDisabled(el.joinButton, false);
-      updatePlayerUxMeta();
+      setText(el.playerConnectionChip, "CONNECTED");
+      el.joinButton.disabled = false;
+      setStatus("READY", "輸入暱稱、選角色後加入戰場。");
     });
-
-    connection.on("data", (message) => {
-      if (!message || typeof message !== "object") return;
-
-      if (message.type === "joined") {
-        appState.joinRequested = false;
-        appState.localPlayer = message.player;
-        appState.localPlayerSnapshot = Array.isArray(message.players) ? message.players : [];
-        appState.gamePhase = message.gamePhase || "lobby";
-        appState.countdownValue = message.countdownValue || "";
-        appState.winnerId = message.winnerId;
-        el.joinPanel.classList.add("hidden");
-        el.controllerPanel.classList.remove("hidden");
-        setText(el.playerGreeting, `${message.player.name}，準備開打`);
-        renderPlayerPreview(message.player);
-        appState.lastPhysicsAt = 0;
-        updatePlayerStatus();
-        updatePlayerUxMeta();
-        setText(el.joinButton, "加入戰場");
-        status("加入成功，等待亂鬥開始。");
-      }
-
-      if (message.type === "state") {
-        applyRemoteState(message);
-      }
-
-      if (message.type === "winner") {
-        appState.winnerId = message.winnerId;
-        playVictoryFanfare();
-        updatePlayerStatus();
-        updatePlayerUxMeta();
-      }
-
-      if (message.type === "attack-hit") {
-        triggerMobileHitFeedback(message.amount, message.targetName);
-      }
-    });
-
+    connection.on("data", handlePlayerMessage);
     connection.on("close", () => {
-      appState.joinRequested = false;
-      status("與房主的連線中斷了，請重新掃碼加入。");
-      setControlButtonsEnabled(false);
-      setDisabled(el.joinButton, true);
-      setText(el.joinButton, "重新加入");
-      updatePlayerUxMeta();
-      updateRoundBanner();
+      setStatus("RECONNECT", "和房主斷線，請重新掃碼加入。");
+      setControls(false);
     });
+    window.setInterval(() => send(connection, { t: "heartbeat", id: state.localPlayerId }), 3000);
   });
+  peer.on("error", () => setStatus("ERROR", "加入失敗，請確認 QR Code 或重新整理。"));
 
-  peer.on("error", (error) => {
-    status(`加入失敗：${error.type || "unknown error"}`);
+  el.joinButton?.addEventListener("click", () => {
+    if (!state.hostConnection?.open) return;
+    const name = el.playerName.value.trim() || "Player";
+    el.joinButton.disabled = true;
+    setStatus("JOINING", "正在加入房間...");
+    send(state.hostConnection, {
+      t: "join",
+      p: { id: state.localPlayerId, name, avatarId: state.selectedAvatarId }
+    });
   });
 }
 
-function wireEvents() {
-  el.copyLinkButton.addEventListener("click", async () => {
-    if (!appState.joinUrl) return;
-    try {
-      await navigator.clipboard.writeText(appState.joinUrl);
-      status("加入連結已複製。");
-    } catch (_error) {
-      status("無法自動複製，請手動複製畫面上的加入網址。");
-    }
+function startServerPlayerMode(serverUrl, room) {
+  state.mode = "player";
+  state.serverUrl = serverUrl;
+  state.roomCode = room;
+  setVisible(el.hostView, false);
+  setVisible(el.playerView, true);
+  setupAvatarPicker();
+  wirePlayerControls();
+  setStatus("CONNECTING", "正在連接房間伺服器...");
+  const socket = new WebSocket(serverUrl);
+  state.serverSocket = socket;
+  socket.addEventListener("open", () => {
+    setText(el.playerConnectionChip, "CONNECTED");
+    el.joinButton.disabled = false;
+    setStatus("READY", "輸入暱稱、選角色後加入戰場。");
   });
-
-  el.startRaceButton.addEventListener("click", () => {
-    getAudioContext();
-    if (appState.players.size < 2) {
-      status("至少要 2 位玩家才能開始。");
-      return;
-    }
-    startBattleCountdown();
-    status("倒數開始，準備開打！");
+  socket.addEventListener("message", (event) => handlePlayerMessage(JSON.parse(event.data)));
+  socket.addEventListener("close", () => {
+    setStatus("RECONNECT", "和房間伺服器斷線，請重新掃碼。");
+    setControls(false);
   });
-
-  el.resetRaceButton.addEventListener("click", () => {
-    resetBattle();
-    status("本局已重設，玩家可以準備下一場。");
-  });
-
-  setDisabled(el.joinButton, true);
-  el.joinButton.addEventListener("click", () => {
-    if (appState.joinRequested || !appState.hostConnection?.open) return;
+  window.setInterval(() => {
+    sendServer({ t: "client-event", room: state.roomCode, id: state.localPlayerId, event: { t: "heartbeat", id: state.localPlayerId } });
+  }, 3000);
+  el.joinButton?.addEventListener("click", () => {
+    if (state.serverSocket?.readyState !== WebSocket.OPEN) return;
     const name = el.playerName.value.trim() || "Player";
-    const avatar = getAvatarById(appState.selectedAvatarId);
-    getAudioContext();
-    appState.joinRequested = true;
-    setDisabled(el.joinButton, true);
-    setText(el.joinButton, "加入中...");
-    appState.hostConnection.send({
-      type: "join",
-      player: {
-        id: appState.playerId,
-        name,
-        avatarId: avatar.id
-      }
+    el.joinButton.disabled = true;
+    setStatus("JOINING", "正在加入房間...");
+    sendServer({
+      t: "join-room",
+      room: state.roomCode,
+      player: { id: state.localPlayerId, name, avatarId: state.selectedAvatarId }
     });
-    status("正在送出加入請求...");
-    updatePlayerUxMeta();
   });
+}
 
-  el.tutorialCloseButton?.addEventListener("click", closeTutorial);
-  el.tutorialOverlay?.addEventListener("click", (event) => {
-    if (event.target === el.tutorialOverlay) {
-      closeTutorial();
-    }
-  });
-
-  const sendMove = (direction) => {
-    if (!appState.hostConnection?.open || !appState.localPlayer) return;
-    if (el.leftButton.disabled || el.rightButton.disabled || appState.gamePhase !== "battle") return;
-    appState.hostConnection.send({ type: "move", playerId: appState.playerId, direction });
-    const now = Date.now();
-    if (now - appState.lastLocalStepToneAt > 120) {
-      appState.lastLocalStepToneAt = now;
-      playStepTone(direction);
-    }
-  };
-
-  const sendMoveStop = (direction) => {
-    if (!appState.hostConnection?.open || !appState.localPlayer) return;
-    appState.hostConnection.send({ type: "move-stop", playerId: appState.playerId, direction });
-  };
-
-  const sendJump = () => {
-    if (!appState.hostConnection?.open || !appState.localPlayer || el.jumpButton.disabled) return;
-    const now = Date.now();
-    if (now - appState.lastLocalJumpAt < JUMP_COOLDOWN) return;
-    appState.lastLocalJumpAt = now;
-    optimisticJump();
-    appState.hostConnection.send({ type: "jump", playerId: appState.playerId });
-    playTone(720, 0.05, "square", 0.04);
-  };
-
-  const sendAttack = () => {
-    if (!appState.hostConnection?.open || !appState.localPlayer || el.attackButton.disabled) return;
-    const now = Date.now();
-    if (now - appState.lastLocalAttackAt < ATTACK_COOLDOWN) return;
-    appState.lastLocalAttackAt = now;
-    optimisticAttack();
-    appState.hostConnection.send({ type: "attack", playerId: appState.playerId });
-    playAttackSwingTone(appState.localPlayer.avatarId);
-  };
-
-  const bindMoveButton = (button, direction) => {
-    button.addEventListener("pointerdown", (event) => startMoveHold(event, direction, sendMove, sendMoveStop), { passive: false });
-    const releaseMove = () => stopMoveHold(sendMoveStop);
-    button.addEventListener("pointerup", releaseMove);
-    button.addEventListener("pointercancel", releaseMove);
-    button.addEventListener("pointerleave", releaseMove);
-    button.addEventListener("lostpointercapture", releaseMove);
-    button.addEventListener("contextmenu", (event) => event.preventDefault());
-  };
-
-  bindMoveButton(el.leftButton, "left");
-  bindMoveButton(el.rightButton, "right");
-  el.jumpButton.addEventListener("pointerdown", sendJump, { passive: true });
-  el.attackButton.addEventListener("pointerdown", sendAttack, { passive: true });
-  window.addEventListener("pointerup", () => stopMoveHold(sendMoveStop));
-  window.addEventListener("pointercancel", () => stopMoveHold(sendMoveStop));
-  window.addEventListener("blur", () => stopMoveHold(sendMoveStop));
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopMoveHold(sendMoveStop);
-  });
+function handlePlayerMessage(message) {
+  if (!message || typeof message !== "object") return;
+  if (message.t === "join-rejected") {
+    setStatus("ROOM FULL", "房間已滿，請等待房主清除玩家。");
+    el.joinButton.disabled = false;
+    return;
+  }
+  if (message.t === "joined") {
+    updateFromSnapshot(message.state);
+    setVisible(el.joinPanel, false);
+    setVisible(el.controllerPanel, true);
+    toast("Joined arena.");
+    vibration(35);
+    window.requestAnimationFrame(renderPlayerUi);
+    return;
+  }
+  if (message.t === "state") {
+    updateFromSnapshot(message);
+    return;
+  }
+  if (message.t === "hit-confirm") {
+    setStatus("HIT CONFIRM", `命中 ${message.target}，造成 ${message.damage} 傷害。`);
+    el.attackButton?.classList.add("confirmed");
+    window.setTimeout(() => el.attackButton?.classList.remove("confirmed"), 360);
+    vibration([35, 20, 45]);
+    return;
+  }
+  if (message.t === "got-hit") {
+    setStatus("HIT", `被 ${message.from} 命中，受到 ${message.damage} 傷害。`);
+    vibration([20, 35, 20]);
+    return;
+  }
+  if (message.t === "eliminated") {
+    setStatus("OUT", `你被 ${message.by} 淘汰了。`);
+    setControls(false);
+    vibration([80, 40, 80]);
+    return;
+  }
+  if (message.t === "winner") {
+    chord([[523, 0, 0.1], [784, 120, 0.16]]);
+  }
+  if (message.t === "kicked") {
+    setStatus("REMOVED", "你已被房主移出房間。");
+    setControls(false);
+  }
 }
 
 function init() {
-  wireEvents();
-  renderCountdownOverlay();
-  startRenderLoop();
-  updateHostUx(0, 0);
-  updatePlayerUxMeta();
-  updateRoundBanner();
-  maybeShowTutorial();
-
   const params = new URLSearchParams(window.location.search);
-  const join = params.get("join");
-
-  if (join) {
-    startPlayerMode(join);
-  } else {
-    startHostMode();
-  }
+  const serverUrl = params.get("server");
+  const serverRoom = params.get("room");
+  const hostId = params.get("join");
+  if (serverUrl && serverRoom) startServerPlayerMode(serverUrl, serverRoom);
+  else if (serverUrl) startServerHostMode(serverUrl);
+  else if (hostId) startPlayerMode(hostId);
+  else startHostMode();
 }
 
 init();

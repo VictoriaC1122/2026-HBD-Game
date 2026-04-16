@@ -2,227 +2,217 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Birthday Battle Arena</title>
     <meta
       name="description"
-      content="多人手機加入的生日亂鬥遊戲，掃 QR Code 一起進場，打到最後活下來的人獲勝。"
+      content="Birthday Battle Arena 是一個多人手機加入的派對亂鬥遊戲，房主開大螢幕，玩家掃 QR Code 用手機控制角色。"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Noto+Sans+TC:wght@400;500;700;900&family=Outfit:wght@500;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Noto+Sans+TC:wght@400;500;700;900&family=Outfit:wght@500;700;800;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="tutorialOverlay" class="tutorial-overlay hidden" aria-hidden="true">
-      <div class="tutorial-card">
-        <p class="section-label">遊戲教學</p>
-        <h2>30 秒內上手</h2>
-        <div class="tutorial-steps">
-          <div class="tutorial-step">
-            <strong>1. 房主開房</strong>
-            <span>用電腦或電視開啟主畫面，讓大家掃 QR Code 加入。</span>
-          </div>
-          <div class="tutorial-step">
-            <strong>2. 玩家選角色</strong>
-            <span>手機輸入名字、選頭像，看到 CONNECTED 就代表控制器就緒。</span>
-          </div>
-          <div class="tutorial-step">
-            <strong>3. 開打求生</strong>
-            <span>長按左右移動、JUMP 閃招、ATTACK 近戰輸出，最後活下來的人獲勝。</span>
-          </div>
-        </div>
-        <div class="tutorial-actions">
-          <button id="tutorialCloseButton" class="primary-button">開始遊玩</button>
-        </div>
-      </div>
+    <div class="ambient-bg" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+      <span class="sparkle-field"></span>
     </div>
 
-    <div class="pixel-sky">
-      <div class="pixel-cloud cloud-a"></div>
-      <div class="pixel-cloud cloud-b"></div>
-      <div class="pixel-cloud cloud-c"></div>
-      <div class="pixel-mountain mountain-a"></div>
-      <div class="pixel-mountain mountain-b"></div>
-    </div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <main class="app-shell">
-      <section class="hero-card">
-        <div class="hero-layout">
-          <div class="hero-copy">
-            <p class="eyebrow">Party Brawl Arena</p>
+      <section id="hostView" class="host-screen hidden" aria-label="房主大螢幕">
+        <header class="hero-board">
+          <div class="hero-title">
+            <p class="eyebrow">Birthday Party Brawler</p>
             <h1>Birthday Battle Arena</h1>
-            <p class="hero-text">
-              掃 QR Code 用手機加入，全部人同場開打。左右移動、跳躍、揮擊，血條歸零就淘汰，最後活著的人就是今晚冠軍。
+            <p>
+              掃碼加入，手機就是控制器。最後活下來的人就是本局冠軍。
             </p>
           </div>
-          <div class="hero-steps hero-summary-card">
-            <div class="mini-step">
-              <strong>掃碼加入，手機直接操控</strong>
-              <p>房主開畫面，玩家掃碼進場，同場亂鬥到最後一人。</p>
+
+          <aside class="join-board" aria-label="加入資訊">
+            <div class="scan-label">SCAN TO JOIN</div>
+            <div id="qrCode" class="qr-box" aria-label="加入房間 QR Code"></div>
+            <div class="room-code-wrap">
+              <span>ROOM CODE</span>
+              <strong id="roomCode">----</strong>
             </div>
+            <p id="joinUrl" class="join-url"></p>
+          </aside>
+
+          <section class="host-command-panel" aria-label="主持操作台">
+            <div class="capacity-ring">
+              <strong id="playerCount">0 / 50</strong>
+              <span>JOINED</span>
+            </div>
+            <div class="host-actions">
+              <button id="startGameButton" class="primary-button">開始亂鬥</button>
+              <button id="playAgainButton" class="primary-button ghost">再來一局</button>
+              <button id="resetGameButton" class="secondary-button">重設本局</button>
+              <button id="copyLinkButton" class="secondary-button">複製連結</button>
+            </div>
+            <div class="host-tools">
+              <label>
+                <span>Max Players</span>
+                <input id="maxPlayersInput" type="number" min="2" max="50" value="50" />
+              </label>
+              <label>
+                <span>Room State</span>
+                <select id="phaseSelect">
+                  <option value="lobby">Lobby</option>
+                  <option value="countdown">Countdown</option>
+                  <option value="battle">Battle</option>
+                  <option value="finished">Result</option>
+                </select>
+              </label>
+              <button id="soundToggleButton" class="tool-button" aria-pressed="true">Sound On</button>
+              <button id="cleanupButton" class="tool-button">清除離線玩家</button>
+            </div>
+          </section>
+        </header>
+
+        <section class="status-strip" aria-label="遊戲狀態">
+          <div>
+            <span>MODE</span>
+            <strong id="hudMode">LOBBY</strong>
           </div>
-        </div>
+          <div>
+            <span>ALIVE</span>
+            <strong id="hudAlive">0</strong>
+          </div>
+          <div>
+            <span>ROUND TIMER</span>
+            <strong id="hudTimer">--</strong>
+          </div>
+          <div>
+            <span>LEADER</span>
+            <strong id="hostLeader">等待中</strong>
+          </div>
+        </section>
+
+        <section class="stage-layout">
+          <section class="arena-panel" aria-label="主舞台">
+            <div class="stage-topline">
+              <div>
+                <p class="section-label">Main Stage</p>
+                <h2>蘑菇村生日競技場</h2>
+              </div>
+              <p id="raceSummary">等待玩家加入...</p>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="arenaCanvas" width="1280" height="720" aria-label="Battle arena"></canvas>
+              <div id="countdownOverlay" class="countdown-overlay hidden">
+                <div id="countdownNumber" class="countdown-number">3</div>
+                <div id="countdownLabel" class="countdown-label">GET READY</div>
+              </div>
+              <div id="winnerOverlay" class="winner-overlay hidden"></div>
+            </div>
+          </section>
+
+          <aside class="side-stack">
+            <section class="panel-card">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-label">Lobby</p>
+                  <h2>玩家列表</h2>
+                </div>
+                <span id="lobbySummary">0 joined</span>
+              </div>
+              <div id="playerGrid" class="player-grid empty-state">
+                <p>玩家加入後會出現在這裡。</p>
+              </div>
+            </section>
+
+            <section class="panel-card">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-label">Battle Feed</p>
+                  <h2>戰況快報</h2>
+                </div>
+              </div>
+              <ol id="battleFeed" class="battle-feed">
+                <li>房間準備中，等待玩家掃碼加入。</li>
+              </ol>
+            </section>
+          </aside>
+        </section>
+
+        <details class="info-drawer">
+          <summary>玩法與部署資訊</summary>
+          <div class="info-grid">
+            <p>房主使用大螢幕開啟本頁，玩家掃 QR Code 加入，選角色後用手機控制。</p>
+            <p>目前前端仍可直接部署在 GitHub Pages。若需要更穩定的 50 人同步，請使用附帶的 WebSocket server。</p>
+          </div>
+        </details>
       </section>
 
-      <section id="statusBanner" class="status-banner">正在準備戰場...</section>
+      <section id="playerView" class="player-screen hidden" aria-label="玩家手機控制器">
+        <div id="joinPanel" class="mobile-card join-card">
+          <p class="eyebrow">Join Battle</p>
+          <h1>加入生日亂鬥</h1>
+          <p class="mobile-copy">輸入暱稱、選角色，加入後手機會變成控制器。</p>
+          <label class="field-label" for="playerName">Nickname</label>
+          <input id="playerName" class="text-input" type="text" maxlength="16" autocomplete="nickname" placeholder="例如：小婷" />
 
-      <section id="hostView" class="panel hidden" aria-label="主機畫面">
-        <div class="panel-grid host-grid">
-          <div class="card room-card">
-            <div class="card-header">
-              <div>
-                <p class="section-label">房間資訊</p>
-                <h2>讓大家掃碼進場</h2>
-              </div>
-              <button id="copyLinkButton" class="secondary-button">複製加入連結</button>
-            </div>
-
-            <div class="room-layout">
-              <div id="qrCode" class="qr-box" aria-label="加入房間 QR Code"></div>
-              <div class="room-meta">
-                <div class="stat-block">
-                  <span class="stat-label">房間代碼</span>
-                  <strong id="roomCode">----</strong>
-                </div>
-                <div class="stat-block">
-                  <span class="stat-label">加入網址</span>
-                  <p id="joinUrl" class="join-url"></p>
-                </div>
-                <div class="stat-block">
-                  <span class="stat-label">目前玩家</span>
-                  <strong id="playerCount">0</strong>
-                </div>
-              </div>
-            </div>
+          <div class="avatar-header">
+            <span class="field-label">Choose Fighter</span>
+            <strong id="selectedAvatarName">Crimson Warrior</strong>
           </div>
+          <div id="avatarPicker" class="avatar-picker"></div>
 
-          <div class="card controls-card">
-            <div class="card-header">
-              <div>
-                <p class="section-label">比賽控制</p>
-                <h2>房主操作台</h2>
-              </div>
-            </div>
-
-            <div class="host-status-grid">
-              <div class="host-mini-card">
-                <span class="host-mini-label">目前存活</span>
-                <strong id="hostLeader">等待中</strong>
-              </div>
-              <div class="host-mini-card">
-                <span class="host-mini-label">目前狀態</span>
-                <strong id="hostPhase">LOBBY</strong>
-              </div>
-            </div>
-
-            <div class="controls-row">
-              <button id="startRaceButton" class="primary-button">開始亂鬥</button>
-              <button id="resetRaceButton" class="secondary-button">重設本局</button>
-            </div>
-            <div id="hostNextStep" class="host-next-step">
-              <strong>下一步</strong>
-              <span>等待至少 2 位玩家加入後開始。</span>
-            </div>
-          </div>
+          <button id="joinButton" class="primary-button full-width" disabled>加入戰場</button>
+          <div id="playerConnectionChip" class="connection-chip">CONNECTING</div>
         </div>
 
-        <div class="card race-card">
-          <div class="card-header">
+        <div id="controllerPanel" class="controller-screen hidden">
+          <header class="controller-header">
             <div>
-              <p class="section-label">主舞台</p>
-              <h2>奇幻亂鬥競技場</h2>
+              <p class="eyebrow">Controller</p>
+              <h1 id="playerGreeting">準備開始</h1>
             </div>
-            <div id="raceSummary" class="race-summary">等待玩家加入...</div>
-          </div>
+            <div id="playerStatusSummary" class="controller-status">
+              <strong>WAITING</strong>
+              <span>正在同步房間狀態...</span>
+            </div>
+          </header>
 
-          <div class="race-stage battle-stage">
-            <div class="stage-hud">
-              <div class="hud-chip">
-                <span class="hud-label">PLAYERS</span>
-                <strong id="hudPlayers">0</strong>
-              </div>
-              <div class="hud-chip">
-                <span class="hud-label">MODE</span>
-                <strong id="hudMode">LOBBY</strong>
-              </div>
-              <div class="hud-chip">
-                <span class="hud-label">GOAL</span>
-                <strong>SURVIVE</strong>
-              </div>
-            </div>
+          <section id="playerRoundBanner" class="round-banner hidden">
+            <strong>本局結束</strong>
+            <span>等房主重設後會立即回到下一場。</span>
+          </section>
 
-            <div id="countdownOverlay" class="countdown-overlay hidden">
-              <div id="countdownNumber" class="countdown-number">3</div>
-              <div id="countdownLabel" class="countdown-label">READY</div>
-            </div>
+          <section class="phone-arena-card">
+            <canvas id="playerPreviewCanvas" width="640" height="260" aria-label="Player preview"></canvas>
+          </section>
 
-            <div id="track" class="track"></div>
-          </div>
-
-          <div id="podium" class="podium"></div>
-        </div>
-      </section>
-
-      <section id="playerView" class="panel hidden" aria-label="玩家手機畫面">
-        <div class="card player-card">
-          <div id="joinPanel">
-            <p class="section-label">手機加入</p>
-            <h2>選角色，準備開打</h2>
-            <label class="input-label" for="playerName">你的名字</label>
-            <input id="playerName" class="text-input" type="text" maxlength="16" placeholder="例如：小婷" />
-
-            <div>
-              <div class="avatar-header">
-                <span class="input-label">選一個戰鬥角色</span>
-                <span id="selectedAvatarName" class="avatar-name"></span>
-              </div>
-              <div id="avatarPicker" class="avatar-picker"></div>
+          <section class="controller-deck" aria-label="手機控制器">
+            <div class="movement-zone">
+              <button id="leftButton" class="control-button move" disabled>
+                <span>←</span>
+                <small>LEFT</small>
+              </button>
+              <button id="rightButton" class="control-button move" disabled>
+                <span>→</span>
+                <small>RIGHT</small>
+              </button>
             </div>
-
-            <button id="joinButton" class="primary-button full-width">加入戰場</button>
-          </div>
-
-          <div id="controllerPanel" class="hidden">
-            <p class="section-label">你的控制器</p>
-            <h2 id="playerGreeting">準備開始</h2>
-            <div class="player-live-row">
-              <div id="playerConnectionChip" class="player-connection-chip">CONNECTING</div>
-              <div id="playerStatusSummary" class="player-status-summary">
-                <strong>WAITING</strong>
-                <span>正在準備控制器畫面...</span>
-              </div>
-            </div>
-            <div id="playerRoundBanner" class="player-round-banner hidden">
-              <strong>本局結束</strong>
-              <span>等房主重設後會立即回到下一場。</span>
-            </div>
-            <div class="controller-caption">
-              <span>移動與跳躍</span>
-              <span>攻擊淘汰對手</span>
-            </div>
-            <div class="player-lane-card">
-              <div id="playerLanePreview" class="player-lane-preview"></div>
-            </div>
-            <div class="controller-deck">
-              <div class="control-cluster movement-cluster">
-                <div class="control-cluster-label">移動區</div>
-                <div class="battle-controls-grid movement-grid">
-                  <div class="movement-spacer" aria-hidden="true"></div>
-                  <button id="leftButton" class="boost-button move-button" disabled><span>←</span><small>往左</small></button>
-                  <button id="jumpButton" class="boost-button jump-button" disabled><span>↑</span><small>跳躍</small></button>
-                  <button id="rightButton" class="boost-button move-button" disabled><span>→</span><small>往右</small></button>
-                </div>
-              </div>
-              <div class="control-cluster attack-cluster">
-                <div class="control-cluster-label">攻擊區</div>
-                <button id="attackButton" class="boost-button attack-button" disabled><span>⚔</span><small>攻擊</small></button>
-              </div>
-            </div>
-          </div>
+            <button id="jumpButton" class="control-button jump" disabled>
+              <span>↑</span>
+              <small>JUMP</small>
+            </button>
+            <button id="attackButton" class="control-button attack" disabled>
+              <span>⚔</span>
+              <small>ATTACK</small>
+              <i id="attackCooldown" class="cooldown-ring"></i>
+            </button>
+          </section>
         </div>
       </section>
     </main>
