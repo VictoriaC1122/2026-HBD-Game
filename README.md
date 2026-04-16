@@ -14,6 +14,8 @@
 - 加入 max players、sound toggle、清除離線玩家、手動切換房間狀態等主持工具。
 - 網路訊息改成 compact event：`join`、`input`、`heartbeat`、`state`、`hit-confirm`、`winner`。
 - 補上可選 WebSocket room server，作為未來更穩定 50 人房間的升級路徑。
+- Canvas 會依裝置像素比例自動調整 backing store，保持大螢幕與手機預覽清晰。
+- WebSocket transport 支援 host-to-player direct feedback，命中、被擊中、淘汰、踢出玩家都能回送到指定手機。
 
 ## Static GitHub Pages Deployment
 

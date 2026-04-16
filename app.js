@@ -15,7 +15,8 @@ const CONFIG = {
   attackArcMs: 230,
   attackCooldownMs: 620,
   hitStunMs: 280,
-  inputMinMs: 45
+  inputMinMs: 45,
+  maxDpr: 2
 };
 
 const PHASE = {
@@ -341,6 +342,7 @@ function compactPlayer(player) {
     c: player.connected,
     atk: player.attackUntil,
     hit: player.hitUntil,
+    la: player.lastAttackAt,
     r: player.ready,
     s: player.stats
   };
@@ -364,10 +366,34 @@ function send(connection, message) {
   if (connection?.open) connection.send(message);
 }
 
+function isServerTransport() {
+  return Boolean(state.serverUrl);
+}
+
+function isPlayerConnected() {
+  if (isServerTransport()) return state.serverSocket?.readyState === WebSocket.OPEN;
+  return Boolean(state.hostConnection?.open);
+}
+
 function sendServer(message) {
   if (state.serverSocket?.readyState === WebSocket.OPEN) {
     state.serverSocket.send(JSON.stringify(message));
   }
+}
+
+function sendToPlayer(playerId, message) {
+  if (isServerTransport()) {
+    sendServer({ t: "direct", room: state.roomCode, to: playerId, message });
+    return;
+  }
+  send(state.connections.get(playerId), message);
+}
+
+function broadcastEvent(message) {
+  if (isServerTransport()) {
+    sendServer({ t: "host-event", room: state.roomCode, message });
+  }
+  broadcast(message);
 }
 
 function broadcast(message) {
@@ -569,7 +595,7 @@ function cleanupInactive() {
 function kickPlayer(id) {
   const player = state.players.get(id);
   if (!player) return;
-  send(state.connections.get(id), { t: "kicked" });
+  sendToPlayer(id, { t: "kicked" });
   state.connections.get(id)?.close?.();
   state.connections.delete(id);
   state.players.delete(id);
@@ -604,15 +630,15 @@ function tryAttack(attacker, now) {
     attacker.stats.damage += damage;
     didHit = true;
     addFeed(`${attacker.name} hit ${target.name} for ${damage}`, "hit");
-    send(state.connections.get(attacker.id), { t: "hit-confirm", target: target.name, damage });
-    send(state.connections.get(target.id), { t: "got-hit", from: attacker.name, damage });
+    sendToPlayer(attacker.id, { t: "hit-confirm", target: target.name, damage });
+    sendToPlayer(target.id, { t: "got-hit", from: attacker.name, damage });
     if (target.hp <= 0 && !target.dead) {
       target.dead = true;
       target.input.left = false;
       target.input.right = false;
       attacker.stats.eliminations += 1;
       addFeed(`${target.name} was eliminated by ${attacker.name}`, "ko");
-      send(state.connections.get(target.id), { t: "eliminated", by: attacker.name });
+      sendToPlayer(target.id, { t: "eliminated", by: attacker.name });
       chord([[180, 0, 0.08], [120, 70, 0.1]]);
     }
   });
@@ -636,7 +662,7 @@ function checkWinner() {
     addFeed(`${alive[0].name} wins the round`, "win");
     state.dirtyWinner = true;
     chord([[523, 0, 0.12], [659, 110, 0.12], [784, 220, 0.18], [1046, 360, 0.24]]);
-    broadcast({ t: "winner", id: alive[0].id, name: alive[0].name });
+    broadcastEvent({ t: "winner", id: alive[0].id, name: alive[0].name });
   }
 }
 
@@ -797,16 +823,41 @@ function renderCountdown() {
 }
 
 function worldToCanvas(x, y, canvas) {
+  const { width, height } = canvasSize(canvas);
   return {
-    x: (x / CONFIG.worldWidth) * canvas.width,
-    y: canvas.height - 74 - y * 7.4
+    x: (x / CONFIG.worldWidth) * width,
+    y: height - 74 - y * 7.4
+  };
+}
+
+function resizeCanvasToDisplay(canvas) {
+  if (!canvas) return { width: 0, height: 0, dpr: 1 };
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return { width: canvas.width, height: canvas.height, dpr: 1 };
+  const dpr = Math.min(window.devicePixelRatio || 1, CONFIG.maxDpr);
+  const width = Math.round(rect.width * dpr);
+  const height = Math.round(rect.height * dpr);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  canvas.dataset.logicalWidth = String(rect.width);
+  canvas.dataset.logicalHeight = String(rect.height);
+  canvas.dataset.dpr = String(dpr);
+  return { width: rect.width, height: rect.height, dpr };
+}
+
+function canvasSize(canvas) {
+  return {
+    width: Number(canvas?.dataset.logicalWidth) || canvas?.clientWidth || canvas?.width || 0,
+    height: Number(canvas?.dataset.logicalHeight) || canvas?.clientHeight || canvas?.height || 0
   };
 }
 
 function drawArena(ctx, canvas, players, now, compact = false) {
   if (!ctx || !canvas) return;
-  const w = canvas.width;
-  const h = canvas.height;
+  const { width: w, height: h, dpr } = resizeCanvasToDisplay(canvas);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
   const sky = ctx.createLinearGradient(0, 0, 0, h);
@@ -868,16 +919,17 @@ function drawHouse(ctx, x, y, index) {
 }
 
 function drawPlatforms(ctx, canvas) {
+  const { width, height } = canvasSize(canvas);
   PLATFORMS.forEach((platform) => {
-    const left = (platform.x / 100) * canvas.width;
-    const top = canvas.height - 74 - platform.y * 7.4;
-    const width = (platform.w / 100) * canvas.width;
-    const height = platform.id === "ground" ? 52 : 24;
+    const left = (platform.x / 100) * width;
+    const top = height - 74 - platform.y * 7.4;
+    const platformWidth = (platform.w / 100) * width;
+    const platformHeight = platform.id === "ground" ? 52 : 24;
     ctx.fillStyle = platform.id === "ground" ? "#4f8e4e" : "#8b5f3f";
-    roundRect(ctx, left, top, width, height, 16);
+    roundRect(ctx, left, top, platformWidth, platformHeight, 16);
     ctx.fill();
     ctx.fillStyle = platform.id === "ground" ? "#7ad46d" : "#e1b071";
-    roundRect(ctx, left, top, width, 12, 14);
+    roundRect(ctx, left, top, platformWidth, 12, 14);
     ctx.fill();
   });
 }
@@ -1001,6 +1053,27 @@ function hostLoop(now) {
   window.requestAnimationFrame(hostLoop);
 }
 
+function normalizeSnapshotPlayer(player) {
+  const avatarId = player.a || player.avatarId || state.selectedAvatarId;
+  const stats = player.s || player.stats || { hits: 0, eliminations: 0, damage: 0, survivedMs: 0 };
+  return {
+    id: player.id,
+    n: player.n || player.name || "Player",
+    a: avatarById(avatarId).id,
+    x: Number(player.x ?? 10),
+    y: Number(player.y ?? 8),
+    h: Number(player.h ?? player.hp ?? 100),
+    d: Number(player.d ?? player.dir ?? 1),
+    dead: Boolean(player.dead),
+    c: player.c ?? player.connected ?? true,
+    atk: Number(player.atk ?? player.attackUntil ?? 0),
+    hit: Number(player.hit ?? player.hitUntil ?? 0),
+    la: Number(player.la ?? player.lastAttackAt ?? 0),
+    r: player.r ?? player.ready ?? true,
+    s: stats
+  };
+}
+
 function updateFromSnapshot(roomState) {
   state.phase = roomState.phase || PHASE.LOBBY;
   state.countdownValue = roomState.countdown || "";
@@ -1008,7 +1081,7 @@ function updateFromSnapshot(roomState) {
   state.maxPlayers = roomState.maxPlayers || CONFIG.maxPlayers;
   state.roomCode = roomState.roomCode || state.roomCode;
   state.roundStartedAt = roomState.startedAt || 0;
-  state.snapshot = Array.isArray(roomState.players) ? roomState.players : [];
+  state.snapshot = Array.isArray(roomState.players) ? roomState.players.map(normalizeSnapshotPlayer) : [];
   state.feed = Array.isArray(roomState.feed) ? roomState.feed : state.feed;
 }
 
@@ -1018,7 +1091,7 @@ function localPlayer() {
 
 function renderPlayerUi(now) {
   const me = localPlayer();
-  const connected = Boolean(state.hostConnection?.open);
+  const connected = isPlayerConnected();
   el.playerConnectionChip?.classList.toggle("offline", !connected);
   setText(el.playerConnectionChip, connected ? "CONNECTED" : "RECONNECT");
   if (!me) {
@@ -1045,7 +1118,7 @@ function renderPlayerUi(now) {
     el.playerRoundBanner.innerHTML = "<strong>OUT</strong><span>你已淘汰，現在可以幫朋友加油。</span>";
   }
 
-  const cooldown = Math.max(0, ((me.lastAttackAt || 0) + CONFIG.attackCooldownMs - now) / CONFIG.attackCooldownMs);
+  const cooldown = Math.max(0, ((me.la || 0) + CONFIG.attackCooldownMs - now) / CONFIG.attackCooldownMs);
   el.attackCooldown?.style.setProperty("--cooldown", `${cooldown * 100}%`);
   drawArena(previewCtx, el.playerPreviewCanvas, [me], now, true);
   renderCountdown();
@@ -1054,7 +1127,7 @@ function renderPlayerUi(now) {
 
 function setControls(enabled) {
   [el.leftButton, el.rightButton, el.jumpButton, el.attackButton].forEach((button) => {
-    if (button && button.disabled === enabled) button.disabled = !enabled;
+    if (button && button.disabled !== !enabled) button.disabled = !enabled;
   });
 }
 

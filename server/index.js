@@ -29,6 +29,7 @@ function createRoom(host) {
     code,
     host,
     clients: new Set([host]),
+    playerSockets: new Map(),
     players: new Map(),
     phase: "lobby",
     winnerId: "",
@@ -99,6 +100,7 @@ wss.on("connection", (socket) => {
       socket.playerId = message.player.id;
       socket.role = "player";
       room.clients.add(socket);
+      room.playerSockets.set(socket.playerId, socket);
       room.players.set(message.player.id, {
         ...message.player,
         connected: true,
@@ -117,10 +119,34 @@ wss.on("connection", (socket) => {
       return;
     }
 
+    if (message.t === "direct" && socket === room.host) {
+      const target = room.playerSockets.get(message.to);
+      if (target) send(target, message.message);
+      return;
+    }
+
+    if (message.t === "host-event" && socket === room.host) {
+      broadcast(room, message.message, socket);
+      return;
+    }
+
     if (message.t === "host-state" && socket === room.host) {
       room.phase = message.state?.phase || room.phase;
       room.winnerId = message.state?.winnerId || "";
       room.countdown = message.state?.countdown || "";
+      if (Array.isArray(message.state?.players)) {
+        const authoritativePlayers = new Map();
+        message.state.players.forEach((player) => {
+          const existing = room.players.get(player.id) || {};
+          authoritativePlayers.set(player.id, {
+            ...existing,
+            ...player,
+            connected: player.c ?? existing.connected ?? true,
+            lastSeen: existing.lastSeen || Date.now()
+          });
+        });
+        room.players = authoritativePlayers;
+      }
       broadcast(room, message.state, socket);
       return;
     }
@@ -130,6 +156,7 @@ wss.on("connection", (socket) => {
     const room = rooms.get(socket.roomCode);
     if (!room) return;
     room.clients.delete(socket);
+    if (socket.playerId) room.playerSockets.delete(socket.playerId);
     if (socket.playerId && room.players.has(socket.playerId)) {
       const player = room.players.get(socket.playerId);
       player.connected = false;
