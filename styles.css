@@ -409,6 +409,31 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.stage-topline > div,
+.panel-heading > div {
+  min-width: 0;
+}
+
+.stage-topline .section-label {
+  margin-bottom: 10px;
+  color: #68708f;
+  line-height: 1.1;
+}
+
+.stage-topline h2 {
+  font-family: var(--ui);
+  font-size: clamp(30px, 3.2vw, 48px);
+  font-weight: 900;
+  line-height: 1.18;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.panel-heading h2 {
+  font-size: clamp(30px, 2.6vw, 42px);
+  line-height: 1.08;
+}
+
 .stage-topline p,
 .panel-heading > span {
   margin: 0;
